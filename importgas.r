@@ -37,4 +37,5 @@ gas.data <- lapply(gas.data, function(x) setNames(x, gas.colnames))
 gas.data$ch4$Average_ppb <- gas.data$ch4$Average_ppb * 1000
 gas.data$sf6$Average_ppb <- gas.data$sf6$Average_ppb / 1000
 
-# To do time-series analysis, we probably want to convert the Year/month cols into a single date col
+# To do time-series analysis, we probably want to convert the Year/month cols into a single date col, e.g.,
+# as.Date("2002-1-1", format = "%Y-%m-%d")
