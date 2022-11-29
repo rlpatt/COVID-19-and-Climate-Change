@@ -2,7 +2,7 @@
 # Data is not entirely in R-readable format
 # There are random lines interspersed that are headers, not data
 # Try to use awk to separate the data into files - didn't work
-co2.data <- read.csv("test.csv", header = TRUE)
+# co2.data <- read.csv("test.csv", header = TRUE)
 
 # Set dir to project dir
 # NOTE: CHANGE THIS TO YOUR PROJECT DIRECTORY!
