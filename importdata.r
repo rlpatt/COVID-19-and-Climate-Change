@@ -4,7 +4,7 @@ library(data.table)
 
 # Set dir to project dir
 # NOTE: CHANGE THIS TO YOUR PROJECT DIRECTORY!
-sproject.dir <- "C:/Users/jvons/Documents/NCF/Data_Munging_EDA/Project/"
+project.dir <- "C:/Users/jvons/Documents/NCF/Data_Munging_EDA/Project/"
 data.dir <- "Datasets"
 setwd(file.path(project.dir, data.dir))
 
