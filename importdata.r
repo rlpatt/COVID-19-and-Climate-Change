@@ -1,8 +1,6 @@
-# co2.data <- read.delim("GLB.Ts+dSST.csv", skip = 1, header = TRUE)
-# Data is not entirely in R-readable format
-# There are random lines interspersed that are headers, not data
-# Try to use awk to separate the data into files - didn't work
-# co2.data <- read.csv("test.csv", header = TRUE)
+library(data.table)
+
+#-----Importing NOAA greenhouse gas data-----#
 
 # Set dir to project dir
 # NOTE: CHANGE THIS TO YOUR PROJECT DIRECTORY!
@@ -40,3 +38,19 @@ gas.data$sf6$Average_ppb <- gas.data$sf6$Average_ppb / 1000
 
 # To do time-series analysis, we probably want to convert the Year/month cols into a single date col, e.g.,
 # as.Date("2002-1-1", format = "%Y-%m-%d")
+
+#-----Importing NASA GISTEMP data-----
+# Hacky way of doing it, but it works - this is based on the output of fread()
+# Namely, fread() stopped at line 24 because of the presence of a string character
+# Reverse-engineer the datasets to read separately into dfs
+# test <- fread("GLB.Ts+dSST.csv", skip = 1, header = TRUE)
+# test2 <- fread("GLB.Ts+dSST.csv", skip = 24)
+# test3 <- fread("GLB.Ts+dSST.csv", skip = 48)
+
+# Instead, used awk (see parsetemp.sh) to split the files into 3 sub-csv files
+
+temp.files <- list.files(path = ".", pattern = "nasa_gistemp_[123][.]csv")
+
+# Read files into df list - skip first line, which is string description
+temp.data <- lapply(temp.files, function(x) read.csv(x, skip = 1, header = TRUE))
+names(temp.data) <- c("airsv6", "airsv7", "ghcnv4")
