@@ -41,8 +41,8 @@ wrangle_tempdata <- function() {
     # Convert data to long format to allow for date-based time series plot
     temp.data.long <- lapply(temp.data.na, function(df) df %>%
                             pivot_longer(cols = "Jan":"Dec",
-                                            names_to = "Month",
-                                            values_to = "Temp_diff"))
+                                         names_to = "Month",
+                                         values_to = "Temp_diff"))
 
     # Converting month abbv to numeric
     # Use data.table::set() to modify col j of the df in place for use in lapply - avoids requiring for loop
