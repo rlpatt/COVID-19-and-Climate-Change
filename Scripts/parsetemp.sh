@@ -8,7 +8,7 @@
 # Arguments:
     # 1) Directory of file
     # 2) Filename
-# Usage: bash parsetemp.sh <<filename>
+# Usage: bash parsetemp.sh <file-directory> <filename>
 ##################################################
 
 # Get dir + filename from argument
