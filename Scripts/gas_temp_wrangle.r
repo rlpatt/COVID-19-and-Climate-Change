@@ -36,7 +36,7 @@ wrangle_tempdata <- function() {
     # For each data frame of temp.data, take each column and replace ***** with NA
     temp.data.na <- lapply(temp.data,
                         function(df) as.data.frame(lapply(df, function(x) gsub(x, pattern = "\\*.*",
-                                                                                replacement = NA))))
+                                                                                  replacement = NA))))
 
     # Convert data to long format to allow for date-based time series plot
     temp.data.long <- lapply(temp.data.na, function(df) df %>%

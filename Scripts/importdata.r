@@ -3,7 +3,6 @@ library(data.table)
 #-----Importing NOAA greenhouse gas data-----#
 
 # Set dir to project dir
-# NOTE: CHANGE THIS TO YOUR PROJECT DIRECTORY!
 project.dir <- "C:/Users/jvons/Documents/NCF/Data_Munging_EDA/Project/"
 data.dir <- "Datasets"
 setwd(file.path(project.dir, data.dir))
@@ -12,15 +11,14 @@ setwd(file.path(project.dir, data.dir))
 # gas.data <- lapply(1:length(gas.files), function(x) system(paste("awk '{if ($1 > 2002) print $0}'", gas.files[[x]]), intern = TRUE))
 # Note that trying to read.delim() from pipe was not working, and output can only be captured as a character vector with system()
     # pipe() was interpreting $1 > 2002 as a redirect
-
-# Instead, used awk from the terminal:
+# Instead, used awk from the terminal. See filtergas.sh
 # prefix=$(ls | sed -r "s/[.]txt//"); for name in ${prefix}; do awk '{if ($1 > 2002) print $0}' "${name}.txt" > "${name}-filtered.txt"; done
 
 # Get list of gases of interest for which we have data
 gas.list <- c("ch4", "n2o", "sf6")
 gas.files <- lapply(gas.list, function(x) list.files(path = ".", pattern = paste0(x, ".*filtered\\.txt")))
 
-# Read files into df
+# Read files into df list
 gas.data <- lapply(gas.files, fread)
 names(gas.data) <- gas.list
 
@@ -36,7 +34,7 @@ gas.data <- lapply(gas.data, function(x) setNames(x, gas.colnames))
 gas.data$ch4$Average_ppb <- gas.data$ch4$Average_ppb * 1000
 gas.data$sf6$Average_ppb <- gas.data$sf6$Average_ppb / 1000
 
-# To do time-series analysis, we probably want to convert the Year/month cols into a single date col, e.g.,
+# To do time-series analysis, we probably want to convert the Year/month cols into a single date col
 # as.Date("2002-1-1", format = "%Y-%m-%d")
 
 #-----Importing NASA GISTEMP data-----
