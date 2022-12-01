@@ -7,7 +7,7 @@ This GitHub repository contains the data and scripts used to analyze changes in 
 
 ## Getting started
 
-To begin, first clone this GitHub repository. Open a Windows command prompt (or shell, for *nix/macOS users) use `git clone` to create a local copy of this repository on your machine. Optionally, you may first use `cd` to change into a directory of choice:
+To begin, first clone this GitHub repository. Open a Windows command prompt (or shell, for *nix/macOS users) and use `git clone` to create a local copy of this repository on your machine. Optionally, you may first use `cd` to change into a directory of choice:
 
 ```
 cd <directory of choice>
