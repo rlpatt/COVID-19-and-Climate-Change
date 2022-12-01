@@ -5,7 +5,7 @@ Saurav Kiri, Logan Patterson, Aaron Spielman, Sujit Sivadanam
 
 ## Overview
 
-This GitHub repository contains the data and scripts used to analyze changes in average monthly greenhouse gas atmospheric concentrations (CH<sub>4</sub>, N<sub>2</sub>O, and SF<sub>6</sub>) as well as average monthly temperature anomalies during the COVID-19 period (defined as **December 2019 -- July 2021**) relative to comparable windows of time.
+This GitHub repository contains the data and scripts used to analyze changes in average monthly greenhouse gas atmospheric concentrations (CH<sub>4</sub>, N<sub>2</sub>O, and SF<sub>6</sub>) as well as average monthly temperature anomalies during the COVID-19 period (defined as **December 2019 - July 2021**) relative to comparable windows of time.
 
 ## Getting started
 
