@@ -1,12 +1,3 @@
-require(tidyverse)
-require(data.table)
-
-# Source import file
-# NOTE: CHANGE FILE.LOC TO THE LOCATION OF IMPORTDATA.R ON YOUR MACHINE!
-file.loc <- "C:/Users/jvons/Documents/NCF/Data_Munging_EDA/Project/Scripts"
-file.name <- "importdata.r"
-source(file.path(file.loc, file.name))
-
 # Moving window function, which will subset a df into a list of dfs by desired month cycle
 df_window_subset <- function(df, init.year.wind = 2003, wind.size = 2, final.init.year = 2019) {
     moving.dfsub.list <- list()
@@ -30,13 +21,19 @@ add_date_col <- function(df, day = 1) {
     return(df)
 }
 
-wrangle_tempdata <- function() {
-    # Need to convert asterisk values to NA in order to convert the data to long format
-    # pivot_longer() cannot combine columns that are of diff atomic types
+tempdata.convert.na <- function(data.list) {
     # For each data frame of temp.data, take each column and replace ***** with NA
-    temp.data.na <- lapply(temp.data,
+    data.list.na <- lapply(data.list,
                         function(df) as.data.frame(lapply(df, function(x) gsub(x, pattern = "\\*.*",
                                                                                   replacement = NA))))
+    return(data.list.na)
+}
+
+wrangle_tempdata <- function(temp.data) {
+    # Need to convert asterisk values to NA in order to convert the data to long format
+    # pivot_longer() cannot combine columns that are of diff atomic types
+    # Use defined tempdata.convert.na above to accomplish this
+    temp.data.na <- tempdata.convert.na(temp.data)
 
     # Convert data to long format to allow for date-based time series plot
     temp.data.long <- lapply(temp.data.na, function(df) df %>%
@@ -59,15 +56,21 @@ wrangle_tempdata <- function() {
     return(windowed.df.list)
 }
 
-wrangle_gasdata <- function() {
+gasdata.convert.na <- function(data.list) {
     # Use replace_with_na() from  packagenaniar to replace values of -9.99 with NA
     # See https://cran.r-project.org/web/packages/naniar/vignettes/replace-with-na.html
     if (!require(naniar)) {
         install.packages("naniar", quietly = TRUE)
     }
-    gas.data.na <- lapply(gas.data, function(df) df %>% 
+    data.list.na <- lapply(data.list, function(df) df %>%
                             replace_with_na(replace = list(Uncertainty_avg = -9.99,
                                                            Uncertainty_trend = -9.99)))
+    return(data.list.na)
+}
+
+wrangle_gasdata <- function(gas.data) {
+    # Replace -9.99 values with NA using gasdata.convert.na() function above
+    gas.data.na <- gasdata.convert.na(gas.data)
     gas.data.date <- lapply(gas.data.na, add_date_col)
     gas.data.windowed.list <- lapply(gas.data.date, df_window_subset)
     return(gas.data.windowed.list)
