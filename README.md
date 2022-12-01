@@ -18,10 +18,10 @@ git clone https://github.com/rlpatt/Data_Munging
 
 This will create a folder called "Data_Munging" in the current directory of the terminal. Inside of these folders are a "Datasets" folder, containing the data required to load into R, as well as a "Scripts" folder which will contain all the necessary scripts for reproducing our analyses.
 
-Already cloned this repository, but looking to update to the newest version? Use `git pull`:
+Already cloned this repository, but looking to update to the newest version? Use `git pull` from the "Data_Munging" directory:
 
 ```
-git pull https://github.com/rlpatt/Data_Munging main
+git pull origin main
 ```
 
 ## Setting up in R
