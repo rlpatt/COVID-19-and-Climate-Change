@@ -18,7 +18,7 @@ This will create a folder called "Data_Munging" in the current directory of the 
 
 ## Setting up in R
 
-After cloning the repository, open the "setup.r" file and run this file. This file will do a number of things:
+After cloning the repository, open the "setup.r" file and run this file. You should not need to make any edits for this file to run successfully. This file will do a number of things:
 
 * Load any required packages
 * Set up the working directory on your machine
