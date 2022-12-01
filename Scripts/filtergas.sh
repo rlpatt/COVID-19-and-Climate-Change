@@ -14,7 +14,7 @@
 FILEDIR=${1}
 
 # Isolate the names of the files without extension (prefixes)
-prefix=$(ls | sed -r "s/[.]txt//"); 
+prefix=$(ls | sed -r "s/[.]txt//")
 
 # For each file name, filter to keep only data 2003 - present
 for name in ${prefix} 
