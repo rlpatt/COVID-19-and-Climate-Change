@@ -22,13 +22,6 @@ library(data.table)
         # I.e., similar to ~/Project/Datasets and ~/Project/Scripts
 
 # Code from https://stackoverflow.com/questions/47044068/
-# Alternative is to use here() (from "here" package)
-    # Walks up dir hierarchy starting from wd during loading until it finds a dir satisfying either:
-    # 1) Contains file matching [.]Rproj$
-    # 2) Contains a .git directory
-# Disadvantage is that it only works if you're in a directory *within* root
-
-
 getCurrentFileLocation <-  function() {
     this_file <- commandArgs() %>%
     tibble::enframe(name = NULL) %>%
@@ -43,6 +36,12 @@ getCurrentFileLocation <-  function() {
     }
     return(dirname(this_file))
 }
+
+# Alternative is to use here() (from "here" package)
+    # Walks up dir hierarchy starting from wd during loading until it finds a dir satisfying either:
+    # 1) Contains file matching [.]Rproj$
+    # 2) Contains a .git directory
+# Disadvantage is that it only works if you're in a directory *within* root
 
 # Get directory of current file, which should be in Scripts sub-dir
 current.dir <- file.path(getCurrentFileLocation())
