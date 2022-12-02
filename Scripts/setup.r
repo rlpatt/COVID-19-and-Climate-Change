@@ -70,6 +70,12 @@ temp.data <- read_temp_data()
 gas.data.converted <- gasdata.convert.na(gas.data)
 temp.data.converted <- tempdata.convert.na(temp.data)
 
+# Also include a "long" version of the temp.data.converted for convenience
+temp.data.converted.long <- lapply(temp.data.converted, function(df) df %>%
+                            pivot_longer(cols = "Jan":"Dec",
+                                         names_to = "Month",
+                                         values_to = "Temp_diff"))
+
 # Wrangle the data to produce the desired moving subset dfs
 gas.data.windowed.dfs <- wrangle_gasdata(gas.data)
 temp.data.windowed.dfs <- wrangle_tempdata(temp.data)

@@ -24,8 +24,8 @@ add_date_col <- function(df, day = 1) {
 tempdata.convert.na <- function(data.list) {
     # For each data frame of temp.data, take each column and replace ***** with NA
     data.list.na <- lapply(data.list,
-                        function(df) as.data.frame(lapply(df, function(x) gsub(x, pattern = "\\*.*",
-                                                                                  replacement = NA))))
+                        function(df) as.data.frame(lapply(df, function(x) as.numeric(gsub(x, pattern = "\\*.*",
+                                                                                     replacement = NA)))))
     return(data.list.na)
 }
 
