@@ -75,3 +75,10 @@ wrangle_gasdata <- function(gas.data) {
     gas.data.windowed.list <- lapply(gas.data.date, df_window_subset)
     return(gas.data.windowed.list)
 }
+
+# Create a function that will select only the "Year", "Month", and data columns
+select_fun <- function(df) {
+    return(df %>%
+        select(contains(c("Year", "Month", "Average", "Temp"))) %>%
+        select(!contains("Day")))
+}

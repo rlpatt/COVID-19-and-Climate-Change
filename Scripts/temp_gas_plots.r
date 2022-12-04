@@ -14,6 +14,9 @@ select_fun <- function(df) {
 
 # Subset each data frame, then use reduce from purr with left_join
 # This will combine all the data frames by the common cols listed with "by"
+# What reduce() does is apply a binary function .f that has a singl return value
+# To join elements of a vector/list into a single value/object
+# E.g., to reduce a vector 1:3, reduce() performs f(f(1,2), 3)
 gas.data.list2 <- lapply(gas.data, select_fun)
 combin.gas.df <- gas.data.list2 %>% purrr::reduce(left_join, by = c("Year", "Month"))
 
@@ -79,3 +82,44 @@ Heatmap(test.airsv6.z, cluster_rows = FALSE, cluster_columns = TRUE, column_labe
         name = "Z-score", row_labels = test.airsv6.combin.month$Month)
 
 unname(unlist(test.airsv6.combin[1, , drop = TRUE])) %>% hist()
+
+
+# Try to combine all temp data together into one df for corr analysis b/w tools
+temp.combin <- lapply(temp.data.converted.long, select_fun) %>% purrr::reduce(left_join, by = c("Year", "Month"))
+temp.combin %>%
+    select_if(is.numeric) %>%
+    select(!Year) %>%
+    cor(use = "pairwise.complete.obs") %>%
+    corrplot(method = "shade",
+             type = "lower",
+             diag = FALSE,
+             addCoef.col = "white",
+             tl.col = "black",
+             order = "hclust")
+
+# Heatmap with the OG converted data frames
+# Make the rownames years so it's easier to keep track of them
+temp.data.monthly <- lapply(temp.data.converted, function(df) df %>% select(contains(c(month.abb))))
+for (i in 1:length(temp.data.monthly)) {
+    rownames(temp.data.monthly[[i]]) <- temp.data.converted[[1]]$"Year"
+}
+
+# Use scale on the *columns* of temp.data.monthly since this data is in wide format
+    # Want z-score of each year by month, not each month by year
+t(apply(temp.data.monthly[[3]], 2, scale)) %>%
+    Heatmap(cluster_columns = TRUE,
+            cluster_rows = FALSE,
+            row_labels = month.abb,
+            column_labels = 2002:2022,
+            name = "Z-score")
+
+# Get Euclidean distances from each year
+# dist() will take an array-like obj and return the pair-wise euclidean distance b/w each column
+euc.dist.v4 <- dist(temp.data.monthly[["ghcnv4"]])
+euc.dist.v4.mat <- as.matrix(euc.dist.v4)
+euc.dist.v4.mat["2021", ][order(euc.dist.v4.mat["2021", ])]
+
+# It seems that by Euclidean distance, 2018 is the closest year to 2021 by temp
+closest.year <- lapply(seq_len(nrow(euc.dist.v4.mat)), 
+                       function(x) euc.dist.v4.mat[x, ][order(euc.dist.v4.mat[x, ])][2])
+names(closest.year) <- 2002:2022
