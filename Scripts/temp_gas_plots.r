@@ -120,6 +120,10 @@ euc.dist.v4.mat <- as.matrix(euc.dist.v4)
 euc.dist.v4.mat["2021", ][order(euc.dist.v4.mat["2021", ])]
 
 # It seems that by Euclidean distance, 2018 is the closest year to 2021 by temp
+
+# For each year, get nearest neighbor by Euclidean distance
+# To do this, take the distance matrix, take each row and order from least to greatest
+# Then, take the 2nd element (since the 1st element will always be the same year, with dist 0)
 closest.year <- lapply(seq_len(nrow(euc.dist.v4.mat)), 
                        function(x) euc.dist.v4.mat[x, ][order(euc.dist.v4.mat[x, ])][2])
 names(closest.year) <- 2002:2022
