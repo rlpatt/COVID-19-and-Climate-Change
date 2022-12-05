@@ -1,0 +1,45 @@
+---
+title: "The Effect of COVID-19 on Global Temperature and Greenhouse Gas Atmospheric Concentration: an EDA Approach"
+author: "Saurav Kiri, Logan Patterson, Aaron Spielman, Sujit Sivadanam"
+date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
+output:
+    bookdown::gitbook:
+        code_folding: hide
+        self_contained: true
+        split_by: none
+        sharing: null
+bibliography: "munging_climate_change.bib"
+csl: "bmc-genomics.csl"
+link-citations: TRUE
+---
+
+# Background
+Coronavirus disease 2019 (COVID-19), caused by the SARS-CoV-2 virus, was declared as a [public health emergency of international concern](https://www.who.int/publications/m/item/covid-19-public-health-emergency-of-international-concern-(pheic)-global-research-and-innovation-forum) on January 30, 2020, and later as a pandemic on March 11 2020 by the World Health Organization (WHO). The announcement of the pandemic lead to widespread lockdowns, reduced travel, and decreased energy usage. To date, the WHO still considers COVID-19 to be an ongoing pandemic, with over [640 million cases reported worldwide](https://covid19.who.int).
+
+The effects of COVID-19 have permeated all aspects of society--including our contributions to climate change. For example, during the core 2020 lockdown period, weekly global CO<sub>2</sub> emissions were decreased relative to 2019, with an associated 6.4% decrease in CO<sub>2</sub> emissions compared to the year prior [@tollefson_covid_2021]. A report from 2020 indicated 50% of the world's population decreased their travel activity by at least 50% at the beginning of the pandemic in April, which coincided with up to a 30% decrease in nitrogen oxide (NO/NO<sub>2</sub>) emissions for this month [@forster_current_2020]. Nitrogen oxide emissions in East China dropped by an average of about 50% during the initial lockdown period (January 23 - February 9) as compared to the 22 days prior [@zhang_nox_2020]. While recent reports have illustrated the resurgence of greenhouse gas emissions following the relaxing of restrictions, it is clear that the COVID-19 lockdown had a positive impact on climate change, if only temporarily.
+
+Given the many scientific and news reports on the effect of lockdowns on the environment (including this popular report covering the water in the canals of Venice, Italy [running clear during lockdown](https://www.cnbc.com/2020/03/18/photos-water-in-venice-italys-canals-clear-amid-covid-19-lockdown.html)), we were interested in making our own investigation into changes of environmental markers during COVID-19, with the goal of answering the question: **is there a noticeable change in greenhouse gas concentrations and global temperature during the COVID-19 period as compared to other years?**
+
+To answer this question, we acquired monthly average [global greenhouse gas concentration data from NOAA](https://gml.noaa.gov/ccgg/trends/) for the following gases:
+
+1. Methane (CH<sub>4</sub>), emitted prominently from landfills, mining, and energy usage facilities
+2. Nitrous oxide (N<sub>2</sub>O), a byproduct of industrial activities
+3. Sulfur hexafluoride (SF<sub>6</sub>), used widely in the electricity industry for insulation
+
+Additionally, monthly average global temperature anomaly data was acquired from the [NASA GIS surface temperature analysis](https://data.giss.nasa.gov/gistemp/), consisting of 3 total datasets, each for the same period of years:
+
+1. Temperature anomalies as measured by AIRS v6
+2. Temperature anomalies as measured by AIRS v7
+3. Temperature anomalies as measured by GHCNv4
+
+Relationships between years were analyzed by clustering, heatmaps, and moving average plots; trends were observed and predicted with simple linear models. See Section \@ref(about-the-data) to learn more about the data, and Section \@ref(data-wrangling-and-quality-assessment) to see how the data was wrangled and assessed prior to visualization/EDA.
+
+# About the Data
+
+```{r}
+
+```
+
+# Data Wrangling and Quality Assessment
+
+# References {-}
