@@ -147,4 +147,7 @@ autoplot(test.prcomp)
 
 # Now perform k-means clustering
 set.seed(1)
+
+# Use fviz_nbclust() to create elbow plot and determine optimal value for k
+fviz_nbclust(test, kmeans, method = "wss")
 kmeans.test <- kmeans(test, centers = 3, nstart = 20)
