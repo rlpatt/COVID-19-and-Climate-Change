@@ -19,6 +19,7 @@ library(ComplexHeatmap) # For making heatmaps
 library(ggfortify)      # For using autoplot() with prcomp()
 library(ClusterR)       # For k-means clustering
 library(factoextra)     # For elbow plots to determine optimal k
+library(cowplot)
 
 # Set up top-level project directory
 # Note that this assumes one of the following:
