@@ -127,3 +127,24 @@ euc.dist.v4.mat["2021", ][order(euc.dist.v4.mat["2021", ])]
 closest.year <- lapply(seq_len(nrow(euc.dist.v4.mat)), 
                        function(x) euc.dist.v4.mat[x, ][order(euc.dist.v4.mat[x, ])][2])
 names(closest.year) <- 2002:2022
+
+# PCA plot
+# Use only rows with complete observations and only monthly data
+# Need to get PCs for years
+test <- temp.data.converted[[1]][2:20, 2:13]
+rownames(test) <- as.character(2003:2021)
+
+test.t <- t(test)
+test %>%
+    prcomp(scale. = TRUE) %>%
+    autoplot(loadings = TRUE,
+             loadings.colour = "blue",
+             loadings.label.color = "red",
+             loadings.label.repel = TRUE) +
+             geom_text(vjust = -1, label = rownames(test))
+autoplot(test.prcomp)
+
+
+# Now perform k-means clustering
+set.seed(1)
+kmeans.test <- kmeans(test, centers = 3, nstart = 20)

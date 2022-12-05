@@ -16,6 +16,8 @@ library(tidyverse)
 library(data.table)
 library(corrplot)
 library(ComplexHeatmap)
+library(ggfortify)
+library(ClusterR)
 
 # Set up top-level project directory
 # Note that this assumes one of the following:
