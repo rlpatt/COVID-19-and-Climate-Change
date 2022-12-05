@@ -21,7 +21,7 @@ library(factoextra)     # For elbow plots to determine optimal k
 
 # Setup
 
-A `setup.RData` file is available within the Scripts folder of the GitHub repository. Here, the workspace image after pre-processing is loaded to facilitate the construction of plots.
+A `setup.RData` file is available within the "Reports" folder of the GitHub repository. Here, the workspace image after pre-processing is loaded to facilitate the construction of plots.
 
 ```{r}
 load("setup.RData")
