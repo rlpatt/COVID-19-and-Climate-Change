@@ -16,7 +16,12 @@ library(corrplot)       # Make correlation plots
 library(ComplexHeatmap) # For making heatmaps
 library(ggfortify)      # For using autoplot() with prcomp()
 library(ClusterR)       # For k-means clustering
-library(factoextra)     # For elbow plots to determine optimal k
+library(factoextra)     # For elbow plots to determine optimal k and k-NN vis
+library(FNN)            # For using get.knn to find k-nearest neighbors of years
+library(kableExtra)
+library(plotly)         # Required for making plots interactive
+library(DT)             # Required to make interactive datatable
+library(ggcorrplot)
 ```
 
 # Setup
@@ -71,15 +76,26 @@ t(apply(temp.data.monthly[[3]], 2, scale)) %>%
 
 Now, it would be interesting to check how the different years correlate in terms of their monthly average temperature anomalies. We employ the use of `corrplot` to do so:
 
-```{r, fig.width = 10, fig.height = 10, fig.fullwidth = TRUE}
+```{r, fig.width = 20, fig.height = 20, fig.fullwidth = TRUE}
 # Transpose to get correlation of years against each other, not months against each other
-temp.data.monthly[["ghcnv4"]] %>%
+# See https://www.datanovia.com/en/blog/how-to-create-an-interactive-correlation-matrix-heatmap-in-r/
+# for interactive correlation plot
+
+temp.cor <- temp.data.monthly[["ghcnv4"]] %>%
   t() %>%
   cor(use = "pairwise.complete.obs") %>%
-  corrplot(method = "shade",
-           order = "AOE",
+  corrplot(order = "hclust",
+           method = "shade",
            addCoef.col = "white",
-           tl.col = "black")
+           addrect = 3,
+           tl.col = "black",
+           number.cex = 2,
+           tl.cex = 2,
+           cl.cex = 2,
+           rect.lwd = 4)
+
+temp.cor <- temp.data.monthly[[3]] %>% t() %>% cor(use = "pairwise.complete.obs")
+temp.cor.pmat <- cor_pmat(temp.cor)
 ```
 
 
@@ -127,9 +143,34 @@ temp.ghcn %>%
            loadings.label.colour = "magenta",
            loadings.label.repel = TRUE) +
            geom_text(vjust = -1,
-                       label = rownames(temp.ghcn.clustered),
-                       color = temp.ghcn.clustered$Group) +
+                     label = rownames(temp.ghcn.clustered),
+                     color = temp.ghcn.clustered$Group) +
            theme(axis.line = element_line(size = 1),
                  axis.title = element_text(size = 14),
                  axis.text = element_text(size = 14))
+```
+
+Here are the years with their nearest neighbor by Euclidean distance in $R^{12}$, shown as a map using `fviz_dist` and `get_dist`, which takes the Euclidean distance of rows of a data frame:
+```{r}
+temp.ghcn %>%
+  get_dist() %>%
+  fviz_dist() %>%
+  ggplotly()
+
+# To extract nearest neighbors, see: https://stackoverflow.com/questions/41770948/
+# Also see https://gis.stackexchange.com/questions/320802/
+# And see documentation for get.knn - will return the k-nearest neighbors of a df
+year.nn <- get.knn(temp.ghcn, k = 1)
+
+# Indices of nearest neighbors are stored in nn.index
+nearest.year <- lapply(year.nn$nn.index, function(i) rownames(temp.ghcn)[i])
+nearest.year.df <- data.frame(Year = as.numeric(rownames(temp.ghcn)),
+                              "Nearest Neighbor" = as.numeric(unname(unlist(nearest.year))),
+                              Distance = year.nn$nn.dist[, 1],
+                              check.names = FALSE)  # To avoid replacing space w/ period
+nearest.year.df <- cbind(nearest.year.df,
+                         "Distance b/w Years" = abs(nearest.year.df$Year - nearest.year.df$"Nearest Neighbor"))
+
+# Use datatable; produces sortable, interactive table when knitted
+DT::datatable(nearest.year.df)
 ```
