@@ -1,3 +1,4 @@
 Scripts/munging_project.Rmd
 Scripts/temp_gas_plots.r
 Reports/*.html
+Reports/*.bib
