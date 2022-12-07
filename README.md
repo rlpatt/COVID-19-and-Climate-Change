@@ -37,3 +37,6 @@ After cloning the repository, open the "setup.r" file and run this file. You sho
     + Add the split-windowed data frames to your local directory (see `gas_temp_wrangle.r` for more details)
 
 All objects can be called from any other script following the exectuion of `setup.r`. Refer to the variable names in `setup.r` for your specific use.
+
+## Plotting notebooks
+Some plotting notebooks are available for viewing in the "Reports" folder. These notebooks include figures used in the final report as well as some basic discussion of methods and interpretations. To run these interactive notebooks, ensure that when launching the `.Rmd` file, the `setup.RData` file is in the same directory as the notebook. This `.RData` file is loaded by the notebook, and allows for simplification of the notebook at the source level. Some plots are freely interactive, as is the nearest neighbor table at the end of the `temp_plots.Rmd` file.
