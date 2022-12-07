@@ -40,3 +40,5 @@ All objects can be called from any other script following the exectuion of `setu
 
 ## Plotting notebooks
 Some plotting notebooks are available for viewing in the "Reports" folder. These notebooks include figures used in the final report as well as some basic discussion of methods and interpretations. To run these interactive notebooks, ensure that when launching the `.Rmd` file, the `setup.RData` file is in the same directory as the notebook. This `.RData` file is loaded by the notebook, and allows for simplification of the notebook at the source level. Some plots are freely interactive, as is the nearest neighbor table at the end of the `temp_plots.Rmd` file.
+
+Additionally, source code for the final report produced with this project can also be found in the "Reports" folder.
