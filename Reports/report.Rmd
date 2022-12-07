@@ -18,7 +18,8 @@ link-citations: TRUE
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 library(tidyverse)
 library(data.table)
-library(corrplot)       # Make correlation plots
+library(corrplot) # Make correlation plots
+#install.packages("ComplexHeatmap")##Logan-"This package isn't available for my version of R.Anyone else having this issue?
 library(ComplexHeatmap) # For making heatmaps
 library(ggfortify)      # For using autoplot() with prcomp()
 library(ClusterR)       # For k-means clustering
@@ -278,6 +279,38 @@ gas.data.windowed.dfs <- wrangle_gasdata(gas.data)
 temp.data.windowed.dfs <- wrangle_tempdata(temp.data)
 ```
 
+############################## Added by Logan (data initialization) ##########################################
+```{r}
+# Moving window function, which will subset a df into a list of dfs by 1 year increments
+df_window_subset_full <- function(df, init.year.wind = 2003, wind.size = 1, final.init.year = 2021) {
+  moving.dfsub.list <- list()
+  while (init.year.wind <= final.init.year) {
+    end.year.wind <- init.year.wind + wind.size
+    # Filter for only years in the current window
+    moving.df <- df %>%
+      filter(Year >= init.year.wind & Year < end.year.wind) 
+    moving.dfsub.list[[paste(init.year.wind)]] <- as.data.frame(moving.df)
+    init.year.wind <- init.year.wind + wind.size
+  }
+  return(moving.dfsub.list)
+}
+
+wrangle_gasdata_full <- function() {
+  # Use replace_with_na() from  packagenaniar to replace values of -9.99 with NA
+  # See https://cran.r-project.org/web/packages/naniar/vignettes/replace-with-na.html
+  if (!require(naniar)) {
+    install.packages("naniar", quietly = TRUE)
+  }
+  gas.data.na <- lapply(gas.data, function(df) df %>% 
+                          replace_with_na(replace = list(Uncertainty_avg = -9.99,
+                                                         Uncertainty_trend = -9.99)))
+  gas.data.date <- lapply(gas.data.na, add_date_col)
+  gas.data.windowed.list <- lapply(gas.data.date, df_window_subset_full)
+  return(gas.data.windowed.list)
+}
+```
+
+
 ```{r, class.source = "fold-show", results = "hold"}
 # Only a few data frames are shown here for convenience
 head(gas.data.windowed.dfs$ch4$"2003-2005")
@@ -346,6 +379,457 @@ In the "airsv6" dataset, the months of January, May, June, & November each have 
 For the gas data, the ratios of column completeness for all three data sets (ch4, n2o, sf6) are each 0.9927052, which is very good because these few missing values won't have a significant effect on the data analysis. These missing values are also all for the final months of 2022 - simply indicating the dataset had not yet been updated as data collection and aggregation is likely still ongoing. Furthermore, each column of each of the three datasets are consistently precise. In terms of outliers, the "ch4" dataset has the most outliers (not shown for simplicity).
 
 # Exploratory Data Analysis - Plots and Commentary
+
+########################################## Added By Logan (dataframes) ##########################################
+```{r}
+#introduce dataset from gas_temp_wrangler.r file function
+gases <- wrangle_gasdata() #Windowed (change to df_window_subset function)
+gases_full <- wrangle_gasdata_full() #Contiguous (change to df_window_subset_full function)
+#head(gases)
+# View(gases$sf6)
+#View(gases_full)
+# View(gases_full$sf6$`2021`)
+#-------------------Dataframe Initialization----------------------
+
+##########convert data to subsetted Dataframes########
+#sf6.df <- as.data.frame(gases$sf6)<- for horizontal data
+big.sf6 <- bind_rows(gases$sf6)
+
+#ch4.df <- as.data.frame(gases$ch4)<- for horizontal data
+big.ch4 <- bind_rows(gases$ch4)
+
+#n2o.df <- as.data.frame(gases$n2o)<- for horizontal data
+big.n2o <- bind_rows(gases$n2o)
+
+#########convert data to contiguous Dataframes########
+
+#sf6_full.df <- as.data.frame(gases_full$sf6) <- for horizontal data
+big.sf6_full <- bind_rows(gases_full$sf6)
+
+#ch4.df_full <- as.data.frame(gases_full$ch4) <- for horizontal data
+big.ch4_full <- bind_rows(gases_full$ch4)
+
+#n2o.df_full <- as.data.frame(gases_full$n2o) <- for horizontal data
+big.n2o_full <- bind_rows(gases_full$n2o)
+
+################Combine the Dataframes#########################
+
+for (i in 1:length(big.sf6)) {
+  big.sf6$gas <- "sf6"
+}
+
+for (i in 1:length(big.ch4)) {
+  big.ch4$gas <- "ch4"
+}
+
+for (i in 1:length(big.n2o)) {
+  big.n2o$gas <- "n2o"
+}
+
+big.gas <- rbind(big.ch4, big.n2o, big.sf6)
+
+#Joined Time Series (contiguous)
+for (i in 1:length(big.sf6_full)) {
+  big.sf6_full$gas <- "sf6"
+}
+
+for (i in 1:length(big.ch4_full)) {
+  big.ch4_full$gas <- "ch4"
+}
+
+for (i in 1:length(big.n2o_full)) {
+  big.n2o_full$gas <- "n2o"
+}
+
+big.gas_full <- rbind(big.ch4_full, big.n2o_full, big.sf6_full)
+
+```
+
+In order to get a general sense for trends among the gas data, we can look at simple time series plots. 
+
+```{r, class.source = "fold-show", fig.cap = "Time Series for Atmospheric SF6, CH4, and N2O"}
+#----------------------------Time Series ---------------------------------
+#############Generate plots for each gas####################
+#sf6 time series
+
+tmp <- data.frame(rectangle_x = c(big.sf6_full[big.sf6_full$Date=="2019-12-01", "Date"], 
+                                   big.sf6_full[big.sf6_full$Date=="2019-12-01", "Date"],
+                                   max(big.sf6_full$Date),
+                                   max(big.sf6_full$Date)),
+                  rectangle_y = c(-Inf, 
+                                   Inf,
+                                   Inf,
+                                   -Inf))
+
+sf6.plot <- ggplot(big.sf6_full, aes(x = Date, y = Average_ppb)) +
+        geom_area(fill="#69b3a2", alpha=0.5) + 
+        geom_line(color = "#69b3a2") +
+        geom_polygon(data = tmp, aes(x = rectangle_x, y = rectangle_y), 
+               fill = "red", 
+               alpha = .3,
+               linetype = "dashed") +
+        scale_x_date(date_breaks = "12 months", date_labels = "%Y %b %d") +
+        theme(axis.text.x=element_text(angle=60, hjust=1)) +
+        geom_vline(linetype = 4, xintercept = as.numeric(big.sf6_full[big.sf6_full$Date=="2019-12-01", "Date"]), color = "red") +
+        ggtitle("SF6 Concentration From 2003 - 2021") +
+        annotate("text", 
+             x = big.sf6_full[big.sf6_full$Date=="2019-08-01", "Date"],
+             y = .006,
+             label = "First Reported Case of COVID-19",
+             angle = 90,
+             size = 4)
+
+#sf6.plot
+sf6_ly <- ggplotly(sf6.plot)
+
+#ch4 time series
+tmp <- data.frame(rectangle_x = c(big.ch4_full[big.ch4_full$Date=="2019-12-01", "Date"], 
+                                  big.ch4_full[big.ch4_full$Date=="2019-12-01", "Date"],
+                                  max(big.ch4_full$Date),
+                                  max(big.ch4_full$Date)),
+                  rectangle_y = c(-Inf, 
+                                  Inf,
+                                  Inf,
+                                  -Inf))
+
+ch4.plot <- ggplot(big.ch4_full, aes(x = Date, y = Average_ppb)) +
+  geom_area(fill="orange", alpha=0.5) + 
+  geom_line(color = "orange") +
+  geom_polygon(data = tmp, aes(x = rectangle_x, y = rectangle_y), 
+               fill = "red", 
+               alpha = .3,
+               linetype = "dashed") +
+  scale_x_date(date_breaks = "12 months", date_labels = "%Y %b %d") +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  geom_vline(linetype = 4, xintercept = as.numeric(big.ch4_full[big.ch4_full$Date=="2019-12-01", "Date"]), color = "red") +
+  ggtitle("CH4 Concentration From 2003 - 2021") +
+  annotate("text", 
+           x = big.ch4_full[big.ch4_full$Date=="2019-09-01", "Date"],
+           y = 1000000,
+           label = "First Reported Case of COVID-19",
+           angle = 90,
+           size = 4)
+
+#ch4.plot
+ch4_ly <- ggplotly(ch4.plot)
+
+#n2o time series
+tmp <- data.frame(rectangle_x = c(big.n2o_full[big.n2o_full$Date=="2019-12-01", "Date"], 
+                                  big.n2o_full[big.n2o_full$Date=="2019-12-01", "Date"],
+                                  max(big.n2o_full$Date),
+                                  max(big.n2o_full$Date)),
+                  rectangle_y = c(-Inf, 
+                                  Inf,
+                                  Inf,
+                                  -Inf))
+
+n2o.plot <- ggplot(big.n2o_full, aes(x = Date, y = Average_ppb)) +
+  geom_area(fill="blue", alpha=0.5) + 
+  geom_line(color = "blue") +
+  geom_polygon(data = tmp, aes(x = rectangle_x, y = rectangle_y), 
+               fill = "red", 
+               alpha = .3,
+               linetype = "dashed") +
+  scale_x_date(date_breaks = "12 months", date_labels = "%Y %b %d") +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  geom_vline(linetype = 4, xintercept = as.numeric(big.n2o_full[big.n2o_full$Date=="2019-12-01", "Date"]), color = "red") +
+  ggtitle("N2O Concentration From 2003 - 2021") +
+  annotate("text", 
+           x = big.n2o_full[big.n2o_full$Date=="2019-08-01", "Date"],
+           y = 150,
+           label = "First Reported Case of COVID-19",
+           angle = 90,
+           size = 4)
+
+#n2o.plot
+n2o_ly <- ggplotly(n2o.plot)
+
+#ggplots
+plot_grid(sf6.plot, ch4.plot, n2o.plot)
+#plotlys 
+sf6_ly
+ch4_ly
+n2o_ly
+
+```  
+
+At a glance, the time series don't suggest that there was much of a trend difference before or after the pandemic. Note that the y-xis scaling for each gas is different, so what's more important here is the rate of change across time. SF6 seemed to show the fastest rate of change, and all 3 plots show a general upward trend in gas concentrations.
+
+Let's break up the series into COVID-length (~20 months) windows:
+
+```{r, class.source = "fold-show", fig.cap = "Windowed Time Series"}
+
+#########################Time Series by Covid Length Blocks#####################
+
+#SF6-------------
+block1 <- as.data.frame(gases$sf6$'2003-2005')
+block2 <- as.data.frame(gases$sf6$'2005-2007')
+block3 <- as.data.frame(gases$sf6$'2007-2009')
+block4 <- as.data.frame(gases$sf6$'2009-2011')
+block5 <- as.data.frame(gases$sf6$'2011-2013')
+block6 <- as.data.frame(gases$sf6$'2013-2015')
+block7 <- as.data.frame(gases$sf6$'2015-2017')
+block8 <- as.data.frame(gases$sf6$'2017-2019')
+block9 <- as.data.frame(gases$sf6$'2019-2021')
+
+time.blocks <- list(block1,
+                 block2,
+                 block3,
+                 block4,
+                 block5,
+                 block6,
+                 block7,
+                 block8,
+                 block9)
+
+str(time.blocks)
+
+block_list <- list()
+for (i in time.blocks){
+  new_element <- ggplot(i, aes(x = Date, y = Average_ppb)) +
+    geom_line(color = "blue") +
+    scale_x_date(date_breaks = "6 months", date_labels = "%Y %b %d") +
+    theme(axis.text.x=element_text(angle=0, hjust=1))
+  
+  block_list[[length(block_list) + 1]] <- new_element
+  
+}
+ 
+block_list
+block.names <- list('SF6 Concentrations for 2003-2005',
+                    'SF6 Concentrations for 2005-2007',
+                    'SF6 Concentrations for 2007-2009',
+                    'SF6 Concentrations for 2009-2011',
+                    'SF6 Concentrations for 2011-2013',
+                    'SF6 Concentrations for 2013-2015',
+                    'SF6 Concentrations for 2015-2017',
+                    'SF6 Concentrations for 2017-2019',
+                    'SF6 Concentrations for 2019-2021')
+
+ggarrange(plotlist = block_list,
+          ncol = 3, nrow = 3, 
+          labels = block.names,
+          hjust = -.2555,
+          vjust = 1.5)
+
+#CH4--------------
+block1 <- as.data.frame(gases$ch4$'2003-2005')
+block2 <- as.data.frame(gases$ch4$'2005-2007')
+block3 <- as.data.frame(gases$ch4$'2007-2009')
+block4 <- as.data.frame(gases$ch4$'2009-2011')
+block5 <- as.data.frame(gases$ch4$'2011-2013')
+block6 <- as.data.frame(gases$ch4$'2013-2015')
+block7 <- as.data.frame(gases$ch4$'2015-2017')
+block8 <- as.data.frame(gases$ch4$'2017-2019')
+block9 <- as.data.frame(gases$ch4$'2019-2021')
+
+time.blocks <- list(block1,
+                    block2,
+                    block3,
+                    block4,
+                    block5,
+                    block6,
+                    block7,
+                    block8,
+                    block9)
+
+#str(time.blocks)
+
+block_list <- list()
+for (i in time.blocks){
+  new_element <- ggplot(i, aes(x = Date, y = Average_ppb)) +
+    geom_line(color = "blue") +
+    scale_x_date(date_breaks = "1 months", date_labels = "%b") +
+    theme(axis.text.x=element_text(angle=0, hjust=1))
+  
+  block_list[[length(block_list) + 1]] <- new_element
+  
+}
+
+block.names <- list('CH4 Concentrations for 2003-2005',
+                    'CH4 Concentrations for 2005-2007',
+                    'CH4 Concentrations for 2007-2009',
+                    'CH4 Concentrations for 2009-2011',
+                    'CH4 Concentrations for 2011-2013',
+                    'CH4 Concentrations for 2013-2015',
+                    'CH4 Concentrations for 2015-2017',
+                    'CH4 Concentrations for 2017-2019',
+                    'CH4 Concentrations for 2019-2021')
+
+ggarrange(plotlist = block_list,
+          ncol = 3, nrow = 3, 
+          labels = block.names,
+          hjust = -.2555,
+          vjust = 1.5)
+
+
+#N2O----------
+block1 <- as.data.frame(gases$n2o$'2003-2005')
+block2 <- as.data.frame(gases$n2o$'2005-2007')
+block3 <- as.data.frame(gases$n2o$'2007-2009')
+block4 <- as.data.frame(gases$n2o$'2009-2011')
+block5 <- as.data.frame(gases$n2o$'2011-2013')
+block6 <- as.data.frame(gases$n2o$'2013-2015')
+block7 <- as.data.frame(gases$n2o$'2015-2017')
+block8 <- as.data.frame(gases$n2o$'2017-2019')
+block9 <- as.data.frame(gases$n2o$'2019-2021')
+
+time.blocks <- list(block1,
+                    block2,
+                    block3,
+                    block4,
+                    block5,
+                    block6,
+                    block7,
+                    block8,
+                    block9)
+
+#str(time.blocks)
+
+block_list <- list()
+for (i in time.blocks){
+  new_element <- ggplot(i, aes(x = Date, y = Average_ppb)) +
+    geom_line(color = "blue") +
+    scale_x_date(date_breaks = "1 months", date_labels = "%b") +
+    theme(axis.text.x=element_text(angle=0, hjust=1))
+  
+  block_list[[length(block_list) + 1]] <- new_element
+  
+}
+
+block.names <- list('N2O Concentrations for 2003-2005',
+                    'N2O Concentrations for 2005-2007',
+                    'N2O Concentrations for 2007-2009',
+                    'N2O Concentrations for 2009-2011',
+                    'N2O Concentrations for 2011-2013',
+                    'N2O Concentrations for 2013-2015',
+                    'N2O Concentrations for 2015-2017',
+                    'N2O Concentrations for 2017-2019',
+                    'N2O Concentrations for 2019-2021')
+
+ggarrange(plotlist = block_list,
+          ncol = 3, nrow = 3, 
+          labels = block.names,
+          hjust = -.2555,
+          vjust = 1.5)
+```
+
+When broken up, it's a little easier to compare pre/post COVID trends. SF6 looks a little smoother within the post-COVID window. CH4 follows similar patterns within each window, but there seems to be a more dramatic dip during the post-COVID month of March 2021. N2O shows a similar trend to SF6, with a smoother plot and less dramatic spike during the COVID window.
+
+Sometimes it can be difficult to show very small changes along a large time frame using just a line. In this case, other, more visually nuanced plots can come in handy. Let's check out heat maps for the gas concentration data: 
+
+```{r,class.source = "fold-show", fig.cap = "Gas Heat Maps"}
+#---------------Heat Map(s)-----------------------------
+######################### SF6 #########################
+sf6_heat.plot <-ggplot(big.sf6_full,aes(x = Year, y= Month, fill=Average_ppb))+
+  geom_tile(color= "white",size=0.1) + 
+  scale_fill_viridis(name="Average_ppb",option ="C", discrete = FALSE)
+sf6_heat.plot <-sf6_heat.plot + scale_y_continuous(trans = "reverse", breaks = unique(big.gas_full$sf6))
+sf6_heat.plot <-sf6_heat.plot + scale_y_continuous(breaks =c(1:12))
+sf6_heat.plot <-sf6_heat.plot + theme_minimal(base_size = 8)
+sf6_heat.plot <-sf6_heat.plot + labs(title= paste("SF6 Concentration"), x="Year", y="Month")
+sf6_heat.plot <-sf6_heat.plot + theme(legend.position = "bottom")+
+  theme(plot.title=element_text(size = 14))+
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.background = element_rect(colour="white"))+
+  theme(plot.title=element_text(hjust=0))+
+  theme(axis.ticks=element_blank())+
+  theme(axis.text=element_text(size=10))+
+  theme(legend.title=element_text(size=10))+
+  theme(legend.text=element_text(size=8)) +
+  theme(legend.key.width = unit(1, 'cm'))
+
+######################### CH4 #########################
+ch4_heat.plot <-ggplot(big.ch4_full,aes(x = Year, y= Month, fill=Average_ppb))+
+  geom_tile(color= "white",size=0.1) + 
+  scale_fill_viridis(name="Average_ppb",option ="C", discrete = FALSE)
+ch4_heat.plot <-ch4_heat.plot + scale_y_continuous(trans = "reverse", breaks = unique(big.gas_full$ch4))
+ch4_heat.plot <-ch4_heat.plot + scale_y_continuous(breaks =c(1:12))
+ch4_heat.plot <-ch4_heat.plot + theme_minimal(base_size = 8)
+ch4_heat.plot <-ch4_heat.plot + labs(title= paste("CH4 Concentration"), x="Year", y="Month")
+ch4_heat.plot <-ch4_heat.plot + theme(legend.position = "bottom")+
+  theme(plot.title=element_text(size = 14))+
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.background = element_rect(colour="white"))+
+  theme(plot.title=element_text(hjust=0))+
+  theme(axis.ticks=element_blank())+
+  theme(axis.text=element_text(size=10))+
+  theme(legend.title=element_text(size=10))+
+  theme(legend.text=element_text(size=8)) +
+  theme(legend.key.width = unit(1, 'cm'))
+
+######################### N2o #########################
+n2o_heat.plot <-ggplot(big.n2o_full,aes(x = Year, y= Month, fill=Average_ppb))+
+  geom_tile(color= "white",size=0.1) + 
+  scale_fill_viridis(name="Average_ppb",option ="C", discrete = FALSE)
+n2o_heat.plot <-n2o_heat.plot + scale_y_continuous(trans = "reverse", breaks = unique(big.gas_full$n2o))
+n2o_heat.plot <-n2o_heat.plot + scale_y_continuous(breaks =c(1:12))
+n2o_heat.plot <-n2o_heat.plot + theme_minimal(base_size = 8)
+n2o_heat.plot <-n2o_heat.plot + labs(title= paste("N2O Concentration"), x="Year", y="Month")
+n2o_heat.plot <-n2o_heat.plot + theme(legend.position = "bottom")+
+  theme(plot.title=element_text(size = 14))+
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.background = element_rect(colour="white"))+
+  theme(plot.title=element_text(hjust=0))+
+  theme(axis.ticks=element_blank())+
+  theme(axis.text=element_text(size=10))+
+  theme(legend.title=element_text(size=10))+
+  theme(legend.text=element_text(size=8)) +
+  theme(legend.key.width = unit(1, 'cm'))
+
+
+######################## Moment of Truth ###############
+ggplotly(sf6_heat.plot)
+ggplotly(ch4_heat.plot)
+ggplotly(n2o_heat.plot)
+
+
+## Big Boy---------
+# lapply(big.gas_full$gas, function(x) {
+#   gg <- ggplot(filter(big.gas_full, gas==x),
+#                aes(x=Year, y=Month, fill=Average_ppb, frame=gas))
+#   gg <- gg + geom_tile(color="white", linewidth=0.1)
+#   gg <- gg + scale_x_discrete(expand=c(0,0))
+#   gg <- gg + scale_y_discrete(expand=c(0,0))
+#   gg <- gg + scale_fill_viridis(name="")
+#   gg <- gg + coord_equal()
+#   gg <- gg + labs(x="Year", y="Month",
+#                   title=sprintf("%s", x))
+#   gg <- gg + theme_tufte()
+#   gg <- gg + theme(axis.ticks=element_blank())
+#   gg <- gg + theme(axis.text=element_text(size=5))
+#   gg <- gg + theme(panel.border=element_blank())
+#   gg <- gg + theme(plot.title=element_text(hjust=0, size=6))
+#   gg <- gg + theme(panel.spacing.x=unit(0.5, "cm"))
+#   gg <- gg + theme(panel.spacing.y=unit(0.5, "cm"))
+#   gg <- gg + theme(legend.title=element_text(size=6))
+#   gg <- gg + theme(legend.title.align=1)
+#   gg <- gg + theme(legend.text=element_text(size=6))
+#   gg <- gg + theme(legend.position="bottom")
+#   gg <- gg + theme(legend.key.size=unit(0.2, "cm"))
+#   gg <- gg + theme(legend.key.width=unit(1, "cm"))
+#   gg
+# }) -> cclist
+# 
+# cclist[["ncol"]] <- 1
+# 
+# do.call(grid.arrange, cclist)
+
+combined_heat.plot <- plot_grid(sf6_heat.plot,
+          ch4_heat.plot,
+          n2o_heat.plot,
+          labels = c("A", "B", "C"),
+          ncol = 1,
+          nrow = 3)
+
+combined_heat.plot
+
+```     
+
+The heat maps provide a little more dimensionality as well to our understanding of the data. Besides the upward trend in gas concentration along each year, we can see that the later months of each year seem to have higher levels than earlier months of the same year. Comparing windows as well, CH4 seems to have a little more of a dramatic change in concentration during the COVID window than among previous years/windows.
+
+########################################### BREAK IN LOGAN'S ADDITIONS ###################################
+
 ## Gas atmospheric concentration predictions
 ```{r}
 # CH4
@@ -565,8 +1049,8 @@ names(sf6_nonperiod) <- gsub('sf6.', "", names(sf6_nonperiod))
 
 ```
 
+We developed boxplots to explore the overall distribution of the gas data for each 20 month period that we defined earlier.      
 
-We first developed boxplots to explore the overall distribution of the gas data for each 20 month period that we defined earlier.
 ```{r, fig.width = 10, fig.fig.height = 10, fig.cap = "Boxplots displaying distribution of mole fraction data for the indicated 20 month windows for each of methane (top left), nitrous oxide (top right), and sulfur hexafluoride (bottom left). PPB = parts per billion."}
 theme_bluewhite <- function(base_size = 11, base_family = "") {
   theme_bw() %+replace% 
@@ -692,6 +1176,86 @@ SF6 prediction with covid period: `r round(lm2$coefficients[1] + (lm2$coefficien
 
 SF6 prediction without covid period: `r round(lm2_wo$coefficients[1] + (lm2_wo$coefficients[2] * 2050.5), 3)` ppb.
 
+################################################# LOGAN'S MOVING AVERAGES ######################################
+A moving average is taken by finding the averages of certain defined subsets within a dataset. With each progressive calculation, the "first" element of each subset is replaced by the "next" element in the defined subset list. This can be useful when trying to ascertain the trend shifts in data and smooth out potentially volatile data sets.
+
+There are several different types of moving averages, but for my next few plots I want to define only two:
+
+The first is the simple moving average (SMA), where a defined number of entries are added together and divided by the entry count. The subset can be defined differently depending on what's needed, but in this case the subset it used by treating each x-value as the median value for its subset. 
+
+The second is the Double Exponential Moving Average (DEMA). This is more complex, but is also more sensitive to recent changes in the data. Its calculation is a little complicated, but essentially you perform a weighted SMA that is smoothed by subtracting the weighted SMA of that trend from double the original moving average. Convoluted? Yes. Responsive? Very.
+
+```{r,class.source = "fold-show", fig.cap = "Moving Averages"}
+#---------------------Moving Average-------------------
+
+##################### sf6 rate of change ###############
+sf6_full.sub_list <- c(big.sf6_full$Average_ppb[-1],last(big.sf6_full$Average_ppb))
+big.sf6_full$avg_change <- sf6_full.sub_list - big.sf6_full$Average_ppb
+
+sf6.rate_of_change <- big.sf6_full %>%
+  ggplot(aes(x = Date, y = avg_change)) +
+  #geom_line() + 
+  geom_ma(color = "blue", ma_fun = SMA, n = 20, linetype = "solid") +# Plot windowed SMA
+  geom_ma(ma_fun = DEMA, n = 20, color = "red", linetype = "longdash") + #Plot windowed DEMA+
+  scale_x_date(date_breaks = "20 months", date_labels = "%Y %b %d") +
+  coord_x_date(xlim = c("2003-12-01", "2021-07-01")) + # Zoom in
+  labs(x = "Year", y = "Average Change (ppb)", 
+       title = "Average Monthly SF6 Changes From 2003 - 2021",
+       subtitle = "Blue = SMA, Red = DEMA, n = 20") +
+  theme_minimal(base_line_size = .05) +
+  theme(text = element_text(size = 16),
+        axis.text.x=element_text(angle=60, hjust=1))
+
+
+#sf6.rate_of_change
+##################### ch4 rate of change ###############
+ch4_full.sub_list <- c(big.ch4_full$Average_ppb[-1],last(big.ch4_full$Average_ppb))
+big.ch4_full$avg_change <- ch4_full.sub_list - big.ch4_full$Average_ppb
+
+ch4.rate_of_change <- big.ch4_full %>%
+  ggplot(aes(x = Date, y = avg_change)) +
+  #geom_line() + 
+  geom_ma(color = "blue", ma_fun = SMA, n = 20, linetype = "solid") +# Plot windowed SMA
+  geom_ma(ma_fun = DEMA, n = 20, color = "red", linetype = "longdash") + #Plot windowed DEMA
+  scale_x_date(date_breaks = "20 months", date_labels = "%Y %b %d") +
+  coord_x_date(xlim = c("2003-12-01", "2021-07-01")) + # Zoom in
+  labs(x = "Year", y = "Average Change (ppb)", 
+       title = "Average Monthly CH4 Changes From 2003 - 2021",
+       subtitle = "Blue = SMA, Red = DEMA, n = 20") +
+  theme_minimal(base_line_size = .05) +
+  theme(text = element_text(size = 16),
+        axis.text.x=element_text(angle=60, hjust=1))
+
+
+#ch4.rate_of_change
+
+
+##################### N2O rate of change ###############
+n2o_full.sub_list <- c(big.n2o_full$Average_ppb[-1],last(big.n2o_full$Average_ppb))
+big.n2o_full$avg_change <- n2o_full.sub_list - big.n2o_full$Average_ppb
+
+n2o.rate_of_change <- big.n2o_full %>%
+  ggplot(aes(x = Date, y = avg_change)) +
+  #geom_line() + 
+  geom_ma(color = "blue", ma_fun = SMA, n = 20, linetype = "solid") +# Plot windowed SMA
+  geom_ma(ma_fun = DEMA, n = 20, color = "red", linetype = "longdash") + #Plot windowed DEMA
+  scale_x_date(date_breaks = "20 months", date_labels = "%Y %b %d") +
+  coord_x_date(xlim = c("2003-12-01", "2021-07-01")) + # Zoom in
+  labs(x = "Year", y = "Average Change (ppb)", 
+       title = "Average Monthly N2O Changes From 2003 - 2021",
+       subtitle = "Blue = SMA, Red = DEMA, n = 20") +
+  theme_minimal(base_line_size = .05) +
+  theme(text = element_text(size = 16),
+        axis.text.x=element_text(angle=60, hjust=1))
+
+
+#n2o.rate_of_change
+
+plot_grid(sf6.rate_of_change, ch4.rate_of_change, n2o.rate_of_change)
+```
+
+So, we can see that each of the gases have their own fluctuations in rate of change over time. SF6 shows a bit more of an upward trend marked by a few dips, whereas CH4 and N2o tend to bounce around a central value. There weren't any glaring differences among the COVID windows, but SF6 and N2O had somewhat irregular dips around the time of the first reported COVID case.
+######################### END LOGAN'S ADDITIONS #########################################
 
 ## NASA Temp Data: Clustering and Correlation
 
