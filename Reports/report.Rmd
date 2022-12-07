@@ -4,6 +4,7 @@ author: "Saurav Kiri, Logan Patterson, Aaron Spielman, Sujit Sivadanam"
 date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
 output:
     bookdown::gitbook:
+        pandoc_args: ["--lua-filter", "figure_caption_patch.lua"]
         code_folding: hide
         self_contained: true
         split_by: none
@@ -13,12 +14,31 @@ csl: "bmc-genomics.csl"
 link-citations: TRUE
 ---
 
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+library(tidyverse)
+library(data.table)
+library(corrplot)       # Make correlation plots
+library(ComplexHeatmap) # For making heatmaps
+library(ggfortify)      # For using autoplot() with prcomp()
+library(ClusterR)       # For k-means clustering
+library(factoextra)     # For elbow plots to determine optimal k and k-NN vis
+library(FNN)            # For using get.knn to find k-nearest neighbors of years
+library(kableExtra)
+library(plotly)         # Required for making plots interactive
+library(DT)             # Required to make interactive datatable
+library(ggcorrplot)
+library(cowplot)
+
+load("setup.RData")
+```
+
 # Background
 Coronavirus disease 2019 (COVID-19), caused by the SARS-CoV-2 virus, was declared as a [public health emergency of international concern](https://www.who.int/publications/m/item/covid-19-public-health-emergency-of-international-concern-(pheic)-global-research-and-innovation-forum) on January 30, 2020, and later as a pandemic on March 11 2020 by the World Health Organization (WHO). The announcement of the pandemic lead to widespread lockdowns, reduced travel, and decreased energy usage. To date, the WHO still considers COVID-19 to be an ongoing pandemic, with over [640 million cases reported worldwide](https://covid19.who.int).
 
 The effects of COVID-19 have permeated all aspects of society--including our contributions to climate change. For example, during the core 2020 lockdown period, weekly global CO<sub>2</sub> emissions were decreased relative to 2019, with an associated 6.4% decrease in CO<sub>2</sub> emissions compared to the year prior [@tollefson_covid_2021]. A report from 2020 indicated 50% of the world's population decreased their travel activity by at least 50% at the beginning of the pandemic in April, which coincided with up to a 30% decrease in nitrogen oxide (NO/NO<sub>2</sub>) emissions for this month [@forster_current_2020]. Nitrogen oxide emissions in East China dropped by an average of about 50% during the initial lockdown period (January 23 - February 9) as compared to the 22 days prior [@zhang_nox_2020]. While recent reports have illustrated the resurgence of greenhouse gas emissions following the relaxing of restrictions, it is clear that the COVID-19 lockdown had a positive impact on climate change, if only temporarily.
 
-Given the many scientific and news reports on the effect of lockdowns on the environment (including this popular report covering the water in the canals of Venice, Italy [running clear during lockdown](https://www.cnbc.com/2020/03/18/photos-water-in-venice-italys-canals-clear-amid-covid-19-lockdown.html)), we were interested in making our own investigation into changes of environmental markers during COVID-19, with the goal of answering the question: **is there a noticeable change in greenhouse gas concentrations and global temperature during the COVID-19 period as compared to other years?**
+Given the many scientific and news reports on the effect of lockdowns on the environment (including this popular report covering the water in the canals of Venice, Italy [running clear during lockdown](https://www.cnbc.com/2020/03/18/photos-water-in-venice-italys-canals-clear-amid-covid-19-lockdown.html)), we were interested in making our own investigation into changes of environmental markers during COVID-19, with the goal of answering the question: **is there a noticeable change in greenhouse gas concentrations and global temperature during the COVID-19 period as compared to other years?** We defined the COVID-19 window as **December 2019 - July 2021** for this purpose; December 2019 was when the first reported case of COVID occurred, and July 2021 is approximately when [half the U.S. population had been vaccinated at least once](https://usafacts.org/visualizations/covid-vaccine-tracker-states).
 
 To answer this question, we acquired monthly average [global greenhouse gas concentration data from NOAA](https://gml.noaa.gov/ccgg/trends/) for the following gases:
 
@@ -28,18 +48,652 @@ To answer this question, we acquired monthly average [global greenhouse gas conc
 
 Additionally, monthly average global temperature anomaly data was acquired from the [NASA GIS surface temperature analysis](https://data.giss.nasa.gov/gistemp/), consisting of 3 total datasets, each for the same period of years:
 
-1. Temperature anomalies as measured by AIRS v6
-2. Temperature anomalies as measured by AIRS v7
-3. Temperature anomalies as measured by GHCNv4
+1. Temperature anomalies from AIRS (Atmospheric InfraRed Sounder) v6
+2. Temperature anomalies from AIRS v7
+3. Temperature anomalies from GHCN (Global Historical Climatology Network) v4
 
-Relationships between years were analyzed by clustering, heatmaps, and moving average plots; trends were observed and predicted with simple linear models. See Section \@ref(about-the-data) to learn more about the data, and Section \@ref(data-wrangling-and-quality-assessment) to see how the data was wrangled and assessed prior to visualization/EDA.
+Relationships between years were analyzed by clustering, heatmaps, and moving average plots; trends were observed and predicted with simple linear models. See Section \@ref(about-the-data) to learn more about the data, and Section \@ref(about-the-data) to see how the data was wrangled and assessed prior to visualization/EDA.
 
 # About the Data
+## Downloading and Filtering
+Data were downloaded from NOAA as 3 fixed-width .txt files; one per gas. Data from NASA was contained in a single .csv file, consisting of the 3 separate datasets (anomalies recorded by each of the above instrumentation/software) split by separator strings.
+
+NOAA data contains information encoded by the following fields (~ 1980 - present): 1) year, 2) month, 3) date in decimal, 4) average monthly gas concentration in mole fraction (parts per), 5) average uncertainty (a standard error measurement performed by NOAA), 6) trend in mole fraction, and 7) standard error of the trend.
+
+NASA data contains information encoded as temperature anomaly in degrees C. For each month of each year (2002 - present), the difference in that month's average temperature from the average temperature of that month during the period 2006 - 2017. Positive anomalies indicate the temperature was warmer than a long-term average; temperature anomalies are favored over absolute temperature for comparative analysis as they can more accurately capture variation of temperature across long durations of time, and are normalized to some frame of reference.
+
+Since both data files contained extraneous textual information, the terminal-based text stream parsing program `awk` was used to filter the data as follows:
+
+```
+# NOAA data
+awk '{if ($1 > 2002) print $0}' "${name}.txt" > "${name}-filtered.txt"
+
+# NASA data
+awk '/Global.*/{n++}{print > "nasa_gistemp_" n ".csv"}' ${FILENAME}
+```
+
+The former command will only save data from 2002 to the present; 2002 was chosen since NASA temperature data only goes back to 2002, and consistency among datasets was desired for the final output. The latter command splits the NASA GISTEMP parent .csv into 3, R-friendly .csv files.
+
+## Data Wrangling
+Our interest was in investigating the properties of data in the COVID window (12/2019 - 07/2021) as compared to previous windows of comparable time. Since the long-term effect of COVID-19 on climate change is considered insignificant, we were hopeful that by choosing similar window "control" sizes, we could compare the short-term effects of COVID within a concentrated window to similar time periods. In effect, since we chose to deal with more granular time points, we did not want to necessarily smooth out the variation of previous years in, say, a 5-year average, as this would result in differences in the distributions of data being compared. This scheme was used for some, but not all, exploratory analysis. Therefore, a list of lists of data frames from the data was created in which each sub-list consisted of data frames for one dataset (e.g., one sublist for methane data, one sublist for nitrous oxide, etc.), and each sublist was a list of data frames broken up by year in 20-month windows:
+
+* December 2003 - July 2005
+* December 2005 - July 2007
+* ...
+* December 2019 - July 2021
+
+
+Structure of the original data; note that null values were encoded as "-9.99" for NOAA data and in asterisks (\*\*\*\*\*) for NASA data; these were converted to NA prior to analysis. Additionally, original NASA data was in "wide" format; in order to be able to create Date objects to construct time-series plots, data was pivoted to long format (shown below).
+```{r, eval = FALSE}
+##### Code from setup.r file
+
+# Set up top-level project directory
+# Note that this assumes one of the following:
+    #1) You have cloned the git repo with git clone
+    #2) You have a file system as defined in the GitHub repository
+        # I.e., similar to ~/Project/Datasets and ~/Project/Scripts
+
+# Code from https://stackoverflow.com/questions/47044068/
+getCurrentFileLocation <-  function() {
+    this_file <- commandArgs() %>%
+    tibble::enframe(name = NULL) %>%
+    tidyr::separate(col = value,
+                    into = c("key", "value"),
+                    sep = "=",
+                    fill = "right") %>%
+    dplyr::filter(key == "--file") %>%
+    dplyr::pull(value)
+    if (length(this_file) == 0) {
+        this_file <- rstudioapi::getSourceEditorContext()$path
+    }
+    return(dirname(this_file))
+}
+
+# Alternative is to use here() (from "here" package)
+    # Walks up dir hierarchy starting from wd during loading until it finds a dir satisfying either:
+    # 1) Contains file matching [.]Rproj$
+    # 2) Contains a .git directory
+# Disadvantage is that it only works if you're in a directory *within* root
+
+# Get directory of current file, which should be in Scripts sub-dir
+current.dir <- file.path(getCurrentFileLocation())
+setwd(current.dir)
+setwd("../")    # The directory immediately above should be project root
+rm(current.dir)
+
+# Setup project, scripts, and data directories
+project.dir <- getwd()
+scripts.dir <- "Scripts"
+data.dir <- "Datasets"
+
+# Set directory to datasets
+setwd(file.path(project.dir, data.dir))
+
+# Source import and wrangle files
+source(file.path(project.dir, scripts.dir, "importdata.r"))
+source(file.path(project.dir, scripts.dir, "gas_temp_wrangle.r"))
+
+# Read in data
+gas.data <- read_gas_data()
+temp.data <- read_temp_data()
+```
 
 ```{r}
+###### Code from the .r files called by setup.r script
+#-----Importing NOAA greenhouse gas data-----#
+# Used awk (see filtergas.sh) to pre-filter NOAA greenhouse gas data for 2003 - present
+
+read_gas_data <- function() {
+    # Get list of gases of interest for which we have data
+    gas.list <- c("ch4", "n2o", "sf6")
+    gas.files <- lapply(gas.list, function(x) list.files(path = ".", pattern = paste0(x, ".*filtered\\.txt")))
+
+    # Read files into df list
+    gas.data <- lapply(gas.files, fread)
+    names(gas.data) <- gas.list
+
+    # CH4 is in ppm, N2O is in ppb, SF6 is in ppt - rename all colnames just to ppb first
+    gas.colnames <- c("Year",
+                    "Month",
+                    "Year_Day_decimal",
+                    "Average_ppb",
+                    "Uncertainty_avg",
+                    "Trend",
+                    "Uncertainty_trend")
+    gas.data <- lapply(gas.data, function(x) setNames(x, gas.colnames))
+
+    # Now rename colnames for ch4 and sf6 
+    ppb.col <- which(gas.colnames == "Average_ppb")
+    colnames(gas.data$ch4)[ppb.col] <- "Average_ppm"
+    colnames(gas.data$sf6)[ppb.col] <- "Average_ppt"
+    return(gas.data)
+}
+
+#-----Importing NASA GISTEMP data-----#
+# Used awk (see parsetemp.sh) to split the files into 3 sub-csv files
+
+read_temp_data <- function() {
+    temp.files <- list.files(path = ".", pattern = "nasa_gistemp_[123][.]csv")
+
+    # Read files into df list - skip first line, which is string description
+    temp.data <- lapply(temp.files, function(x) read.csv(x, skip = 1, header = TRUE))
+    names(temp.data) <- c("airsv6", "airsv7", "ghcnv4")
+    return(temp.data)
+}
 
 ```
 
-# Data Wrangling and Quality Assessment
+
+```{r class.source = "fold-show"}
+# First 4 rows of each data frame
+for (list.obj in list(gas.data, temp.data)) {
+    for (df in list.obj) {
+        print(head(df, n = 4L))
+    }
+}
+```
+
+
+Structure of the wrangled data, with lists of lists:
+```{r}
+# Moving window function, which will subset a df into a list of dfs by desired month cycle
+df_window_subset <- function(df, init.year.wind = 2003, wind.size = 2, final.init.year = 2019) {
+    moving.dfsub.list <- list()
+    while (init.year.wind <= final.init.year) {
+        end.year.wind <- init.year.wind + wind.size
+        # Filter for only years in the current window
+        # Then filter for only December, year X to Jul, year X + 2
+        moving.df <- df %>%
+                        filter(Year >= init.year.wind & Year <= end.year.wind) %>%
+                        filter(!((Year == init.year.wind & Month < 12) | (Year == end.year.wind & Month > 7)))
+        moving.dfsub.list[[paste(init.year.wind, end.year.wind, sep = "-")]] <- as.data.frame(moving.df)
+        init.year.wind <- init.year.wind + wind.size
+    }
+    return(moving.dfsub.list)
+}
+
+# Adds a column of Date objects to a df from cols named Year and Month. Assumes day is constant (1 by default)
+add_date_col <- function(df, day = 1) {
+    df <- df %>% mutate(Date = as.Date(paste(Year, Month, day, sep = "-"),
+                                       format = "%Y-%m-%d"))
+    return(df)
+}
+
+tempdata.convert.na <- function(data.list) {
+    # For each data frame of temp.data, take each column and replace ***** with NA
+    data.list.na <- lapply(data.list,
+                        function(df) as.data.frame(lapply(df, function(x) as.numeric(gsub(x, pattern = "\\*.*",
+                                                                                     replacement = NA)))))
+    return(data.list.na)
+}
+
+wrangle_tempdata <- function(temp.data) {
+    # Need to convert asterisk values to NA in order to convert the data to long format
+    # pivot_longer() cannot combine columns that are of diff atomic types
+    # Use defined tempdata.convert.na above to accomplish this
+    temp.data.na <- tempdata.convert.na(temp.data)
+
+    # Convert data to long format to allow for date-based time series plot
+    temp.data.long <- lapply(temp.data.na, function(df) df %>%
+                            pivot_longer(cols = "Jan":"Dec",
+                                         names_to = "Month",
+                                         values_to = "Temp_diff"))
+
+    # Converting month abbv to numeric
+    # Use data.table::set() to modify col j of the df in place for use in lapply - avoids requiring for loop
+    # Sets the value of col j to that given by the value argument
+    lapply(temp.data.long, function(df) set(df, j = "Month", value = match(df$"Month", month.abb)))
+
+    # Add Date object column for time series analysis
+    temp.data.date <- lapply(temp.data.long, add_date_col)
+
+    # For each data frame in temp.data.long, create the windowed subset df
+    # This produces for each df, a list of sub-dfs
+    # Sub-dfs can be indexed by, e.g., list$airsv6$"2003-2005"
+    windowed.df.list <- lapply(temp.data.date, df_window_subset)
+    return(windowed.df.list)
+}
+
+gasdata.convert.na <- function(data.list) {
+    # Use replace_with_na() from  packagenaniar to replace values of -9.99 with NA
+    # See https://cran.r-project.org/web/packages/naniar/vignettes/replace-with-na.html
+    if (!require(naniar)) {
+        install.packages("naniar", quietly = TRUE)
+    }
+    data.list.na <- lapply(data.list, function(df) df %>%
+                            replace_with_na(replace = list(Uncertainty_avg = -9.99,
+                                                           Uncertainty_trend = -9.99)))
+    return(data.list.na)
+}
+
+wrangle_gasdata <- function(gas.data) {
+    # Replace -9.99 values with NA using gasdata.convert.na() function above
+    gas.data.na <- gasdata.convert.na(gas.data)
+    gas.data.date <- lapply(gas.data.na, add_date_col)
+    gas.data.windowed.list <- lapply(gas.data.date, df_window_subset)
+    return(gas.data.windowed.list)
+}
+
+gas.data.windowed.dfs <- wrangle_gasdata(gas.data)
+temp.data.windowed.dfs <- wrangle_tempdata(temp.data)
+```
+
+```{r, class.source = "fold-show", results = "hold"}
+# Only a few data frames are shown here for convenience
+head(gas.data.windowed.dfs$ch4$"2003-2005")
+tail(gas.data.windowed.dfs$ch4$"2003-2005")
+
+head(temp.data.windowed.dfs$airsv7$"2019-2021")
+tail(temp.data.windowed.dfs$airsv7$"2019-2021")
+```
+
+
+## Quality Assessment
+Below are some summarized results of the quality assessment performed on the data prior to downstream analysis.
+
+```{r, results = "hold"}
+# Column completeness
+col_complete <- function(dataframe){
+  if(!is.data.frame(dataframe)){
+    stop("the object is not a dataframe")
+  }
+  
+  missing_count <- 0
+  for(j in 1:ncol(dataframe)){
+    for(i in 1:nrow(dataframe)){
+      if(is.na(dataframe[i, j])){missing_count <- missing_count+1}
+    }
+  }
+  complete_ratio <- 1 - missing_count/(nrow(dataframe)*ncol(dataframe))
+  return(complete_ratio)
+}
+
+library(visdat)
+library(naniar)
+library(tidyverse)
+
+# Analyzing for completeness
+col_complete(temp.data.converted$airsv6)
+col_complete(temp.data.converted$airsv7)
+col_complete(temp.data.converted$ghcnv4)
+
+# Analyzing for completeness
+col_complete(as.data.frame(gas.data.converted$ch4))
+col_complete(as.data.frame(gas.data.converted$n2o))
+col_complete(as.data.frame(gas.data.converted$sf6))
+```
+
+```{r, results = "hold", fig.cap = "Various plots indicating data quality of acquired climate change data"}
+# Representative plots for analyzing missingness and outliers
+vis_miss(temp.data.converted$airsv6)
+vis_miss(as.data.frame(gas.data.converted$ch4))
+airsv6 <- airsv6 <- subset(temp.data.converted$airsv6, select = -Year)
+airsv7 <- subset(temp.data.converted$airsv7, select = -Year)
+
+airsv6 %>%
+    select(1:12) %>%
+    boxplot()
+
+airsv7 %>%
+    select(1:12) %>%
+    boxplot()
+```
+
+The ratios of column completeness for both the "airsv6" and "airsv7" datasets are both identically the same (0.9573935) while the ratio of column completeness for the "ghcnv4" dataset was just a bit higher (0.9899749) than the other two. In other words, the datasets are almost complete in that the few missing values are not of significant concern. All three of the temp datsets are consistent in terms of precision. Most missing values are found in 2002 (for AIRS v6 and AIRS v7), indicating data collection for this software type had likely not started yet.
+
+In the "airsv6" dataset, the months of January, May, June, & November each have one outlier. In the "airsv7" dataset, January, March, & June each have one outlier while November has five outliers.
+
+For the gas data, the ratios of column completeness for all three data sets (ch4, n2o, sf6) are each 0.9927052, which is very good because these few missing values won't have a significant effect on the data analysis. These missing values are also all for the final months of 2022 - simply indicating the dataset had not yet been updated as data collection and aggregation is likely still ongoing. Furthermore, each column of each of the three datasets are consistently precise. In terms of outliers, the "ch4" dataset has the most outliers (not shown for simplicity).
+
+# Exploratory Data Analysis - Plots and Commentary
+## Gas atmospheric concentration predictions
+```{r}
+# CH4
+# Post-editorial note: originally, we converted everything to ppb
+# We later decided to undo this, but some of our plots still use ppb
+# Therefore, I am manually changing the ppm and ppt columns to ppb
+colnames(gas.data[[1]])[which(colnames(gas.data[[1]]) == "Average_ppm")] <- "Average_ppb"
+gas.data[[1]]$Average_ppb <- gas.data[[1]]$Average_ppb * 1000
+ch4 <- as.data.frame(gas.data[1])
+# colnames(ch4)[which(colnames(ch4) == "ch4.Average_ppm")] <- "Average_ppb"
+# ch4$Average_ppb <- ch4$Average_ppb * 1000
+names(ch4) <- gsub('ch4.', "", names(ch4))
+
+# make ch4 dataframes (18 mos)
+ch4 <- df_window_subset(ch4)
+
+ch4_1 <- as.data.frame(ch4[1])
+ch4_2 <- as.data.frame(ch4[2])
+ch4_3 <- as.data.frame(ch4[3])
+ch4_4 <- as.data.frame(ch4[4])
+ch4_5 <- as.data.frame(ch4[5])
+ch4_6 <- as.data.frame(ch4[6])
+ch4_7 <- as.data.frame(ch4[7])
+ch4_8 <- as.data.frame(ch4[8])
+ch4_9 <- as.data.frame(ch4[9])
+
+# fix col names
+names(ch4_1) <- substring(names(ch4_1), 12)
+names(ch4_2) <- substring(names(ch4_2), 12)
+names(ch4_3) <- substring(names(ch4_3), 12)
+names(ch4_4) <- substring(names(ch4_4), 12)
+names(ch4_5) <- substring(names(ch4_5), 12)
+names(ch4_6) <- substring(names(ch4_6), 12)
+names(ch4_7) <- substring(names(ch4_7), 12)
+names(ch4_8) <- substring(names(ch4_8), 12)
+names(ch4_9) <- substring(names(ch4_9), 12)
+
+# add dates
+ch4_1 <- add_date_col(ch4_1)
+ch4_2 <- add_date_col(ch4_2)
+ch4_3 <- add_date_col(ch4_3)
+ch4_4 <- add_date_col(ch4_4)
+ch4_5 <- add_date_col(ch4_5)
+ch4_6 <- add_date_col(ch4_6)
+ch4_7 <- add_date_col(ch4_7)
+ch4_8 <- add_date_col(ch4_8)
+ch4_9 <- add_date_col(ch4_9)
+
+# make one df
+ch4_df <- rbind(ch4_1, ch4_2, ch4_3, ch4_4, ch4_5, ch4_6, ch4_7, ch4_8, ch4_9)
+ch4_df$Period <- NA
+ch4_df$Period[1:20] <- "Dec '03 - July '05"
+ch4_df$Period[21:40] <- "Dec '05 - July '07"
+ch4_df$Period[41:60] <- "Dec '07 - July '09"
+ch4_df$Period[61:80] <- "Dec '09 - July '11"
+ch4_df$Period[81:100] <- "Dec '11 - July '13"
+ch4_df$Period[101:120] <- "Dec '13 - July '15"
+ch4_df$Period[121:140] <- "Dec '15 - July '17"
+ch4_df$Period[141:160] <- "Dec '17 - July '19"
+ch4_df$Period[161:180] <- "Dec '19 - July '21"
+
+# calculate mean over 18 mo periods
+ch4_periods <- c(1,2,3,4,5,6,7,8,9)
+ch4_period_names <- names(ch4)
+ch4_period_means <- c(mean(ch4_1$Average_ppb), mean(ch4_2$Average_ppb), mean(ch4_3$Average_ppb),
+                  mean(ch4_4$Average_ppb), mean(ch4_5$Average_ppb), mean(ch4_6$Average_ppb),
+                  mean(ch4_7$Average_ppb), mean(ch4_8$Average_ppb), mean(ch4_9$Average_ppb))
+
+ch4_period_df <- data.frame(ch4_periods, ch4_period_names, ch4_period_means)
+
+
+
+
+# N2O
+n2o <- as.data.frame(gas.data[2])
+names(n2o) <- gsub('n2o.', "", names(n2o))
+
+# make n2o dataframes (18 mos)
+n2o <- df_window_subset(n2o)
+
+n2o_1 <- as.data.frame(n2o[1])
+n2o_2 <- as.data.frame(n2o[2])
+n2o_3 <- as.data.frame(n2o[3])
+n2o_4 <- as.data.frame(n2o[4])
+n2o_5 <- as.data.frame(n2o[5])
+n2o_6 <- as.data.frame(n2o[6])
+n2o_7 <- as.data.frame(n2o[7])
+n2o_8 <- as.data.frame(n2o[8])
+n2o_9 <- as.data.frame(n2o[9])
+
+# fix col names
+names(n2o_1) <- substring(names(n2o_1), 12)
+names(n2o_2) <- substring(names(n2o_2), 12)
+names(n2o_3) <- substring(names(n2o_3), 12)
+names(n2o_4) <- substring(names(n2o_4), 12)
+names(n2o_5) <- substring(names(n2o_5), 12)
+names(n2o_6) <- substring(names(n2o_6), 12)
+names(n2o_7) <- substring(names(n2o_7), 12)
+names(n2o_8) <- substring(names(n2o_8), 12)
+names(n2o_9) <- substring(names(n2o_9), 12)
+
+# add dates
+n2o_1 <- add_date_col(n2o_1)
+n2o_2 <- add_date_col(n2o_2)
+n2o_3 <- add_date_col(n2o_3)
+n2o_4 <- add_date_col(n2o_4)
+n2o_5 <- add_date_col(n2o_5)
+n2o_6 <- add_date_col(n2o_6)
+n2o_7 <- add_date_col(n2o_7)
+n2o_8 <- add_date_col(n2o_8)
+n2o_9 <- add_date_col(n2o_9)
+
+# make one df
+n2o_df <- rbind(n2o_1, n2o_2, n2o_3, n2o_4, n2o_5, n2o_6, n2o_7, n2o_8, n2o_9)
+n2o_df$Period <- NA
+n2o_df$Period[1:20] <- "Dec '03 - July '05"
+n2o_df$Period[21:40] <- "Dec '05 - July '07"
+n2o_df$Period[41:60] <- "Dec '07 - July '09"
+n2o_df$Period[61:80] <- "Dec '09 - July '11"
+n2o_df$Period[81:100] <- "Dec '11 - July '13"
+n2o_df$Period[101:120] <- "Dec '13 - July '15"
+n2o_df$Period[121:140] <- "Dec '15 - July '17"
+n2o_df$Period[141:160] <- "Dec '17 - July '19"
+n2o_df$Period[161:180] <- "Dec '19 - July '21"
+
+# calculate mean over 18 mo periods
+n2o_periods <- c(1,2,3,4,5,6,7,8,9)
+n2o_period_names <- names(n2o)
+n2o_period_means <- c(mean(n2o_1$Average_ppb), mean(n2o_2$Average_ppb), mean(n2o_3$Average_ppb),
+                      mean(n2o_4$Average_ppb), mean(n2o_5$Average_ppb), mean(n2o_6$Average_ppb),
+                      mean(n2o_7$Average_ppb), mean(n2o_8$Average_ppb), mean(n2o_9$Average_ppb))
+
+n2o_period_df <- data.frame(n2o_periods, n2o_period_names, n2o_period_means)
+
+
+
+
+# SF6
+colnames(gas.data[[3]])[which(colnames(gas.data[[3]]) == "Average_ppt")] <- "Average_ppb"
+gas.data[[3]]$Average_ppb <- gas.data[[3]]$Average_ppb / 1000
+sf6 <- as.data.frame(gas.data[3])
+names(sf6) <- gsub('sf6.', "", names(sf6))
+
+# make sf6 dataframes (18 mos)
+sf6 <- df_window_subset(sf6)
+
+sf6_1 <- as.data.frame(sf6[1])
+sf6_2 <- as.data.frame(sf6[2])
+sf6_3 <- as.data.frame(sf6[3])
+sf6_4 <- as.data.frame(sf6[4])
+sf6_5 <- as.data.frame(sf6[5])
+sf6_6 <- as.data.frame(sf6[6])
+sf6_7 <- as.data.frame(sf6[7])
+sf6_8 <- as.data.frame(sf6[8])
+sf6_9 <- as.data.frame(sf6[9])
+
+# fix col names
+names(sf6_1) <- substring(names(sf6_1), 12)
+names(sf6_2) <- substring(names(sf6_2), 12)
+names(sf6_3) <- substring(names(sf6_3), 12)
+names(sf6_4) <- substring(names(sf6_4), 12)
+names(sf6_5) <- substring(names(sf6_5), 12)
+names(sf6_6) <- substring(names(sf6_6), 12)
+names(sf6_7) <- substring(names(sf6_7), 12)
+names(sf6_8) <- substring(names(sf6_8), 12)
+names(sf6_9) <- substring(names(sf6_9), 12)
+
+# add dates
+sf6_1 <- add_date_col(sf6_1)
+sf6_2 <- add_date_col(sf6_2)
+sf6_3 <- add_date_col(sf6_3)
+sf6_4 <- add_date_col(sf6_4)
+sf6_5 <- add_date_col(sf6_5)
+sf6_6 <- add_date_col(sf6_6)
+sf6_7 <- add_date_col(sf6_7)
+sf6_8 <- add_date_col(sf6_8)
+sf6_9 <- add_date_col(sf6_9)
+
+# make one df
+sf6_df <- rbind(sf6_1, sf6_2, sf6_3, sf6_4, sf6_5, sf6_6, sf6_7, sf6_8, sf6_9)
+sf6_df$Period <- NA
+sf6_df$Period[1:20] <- "Dec '03 - July '05"
+sf6_df$Period[21:40] <- "Dec '05 - July '07"
+sf6_df$Period[41:60] <- "Dec '07 - July '09"
+sf6_df$Period[61:80] <- "Dec '09 - July '11"
+sf6_df$Period[81:100] <- "Dec '11 - July '13"
+sf6_df$Period[101:120] <- "Dec '13 - July '15"
+sf6_df$Period[121:140] <- "Dec '15 - July '17"
+sf6_df$Period[141:160] <- "Dec '17 - July '19"
+sf6_df$Period[161:180] <- "Dec '19 - July '21"
+
+# caculate mean over 18 mo periods
+sf6_periods <- c(1,2,3,4,5,6,7,8,9)
+sf6_period_names <- names(sf6)
+sf6_period_means <- c(mean(sf6_1$Average_ppb), mean(sf6_2$Average_ppb), mean(sf6_3$Average_ppb),
+                      mean(sf6_4$Average_ppb), mean(sf6_5$Average_ppb), mean(sf6_6$Average_ppb),
+                      mean(sf6_7$Average_ppb), mean(sf6_8$Average_ppb), mean(sf6_9$Average_ppb))
+
+sf6_period_df <- data.frame(sf6_periods, sf6_period_names, sf6_period_means)
+
+
+############################################################################
+
+# make data frames with every month 12/03-07/22
+
+ch4_nonperiod <- as.data.frame(gas.data[1])
+
+names(ch4_nonperiod) <- gsub('ch4.', "", names(ch4_nonperiod))
+
+n2o_nonperiod <- as.data.frame(gas.data[2])
+
+names(n2o_nonperiod) <- gsub('n2o.', "", names(n2o_nonperiod))
+
+sf6_nonperiod <- as.data.frame(gas.data[3])
+
+names(sf6_nonperiod) <- gsub('sf6.', "", names(sf6_nonperiod))
+
+```
+
+
+We first developed boxplots to explore the overall distribution of the gas data for each 20 month period that we defined earlier.
+```{r, fig.width = 10, fig.fig.height = 10, fig.cap = "Boxplots displaying distribution of mole fraction data for the indicated 20 month windows for each of methane (top left), nitrous oxide (top right), and sulfur hexafluoride (bottom left). PPB = parts per billion."}
+theme_bluewhite <- function(base_size = 11, base_family = "") {
+  theme_bw() %+replace% 
+    theme(
+      panel.grid.major  = element_line(color = "white"),
+      panel.background = element_rect(fill = "lightblue"),
+      panel.border = element_rect(color = "lightblue", fill = NA),
+      axis.line = element_line(color = "lightblue"),
+      axis.ticks = element_line(color = "lightblue"),
+      axis.text = element_text(color = "steelblue")
+    )
+}
+
+a <- ggplot(ch4_df) + 
+  geom_boxplot(aes(x = as.factor(Period), y = Average_ppb)) + 
+  labs(title = "CH4") + xlab("20 Month Period") + ylab("PPB") + 
+  theme_bluewhite() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 0.5,
+      vjust = .5
+    ))
+
+b <- ggplot(n2o_df) + 
+  geom_boxplot(aes(x = as.factor(Period), y = Average_ppb)) + 
+  labs(title = "N2O") + xlab("20 Month Period") + ylab("PPB") + 
+  theme_bluewhite() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 0.5,
+      vjust = .5
+    ))
+
+c <- ggplot(sf6_df) + 
+  geom_boxplot(aes(x = as.factor(Period), y = Average_ppb)) + 
+  labs(title = "SF6") + xlab("20 Month Period") + ylab("PPB") + 
+  theme_bluewhite() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 0.5,
+      vjust = .5
+    ))
+
+plot_grid(a, b, c)
+
+```
+
+We noticed a generally linear increase in the central tendency of the distributions as we progressed through each 20 month period. Therefore, we were interested in exploring global greenhouse gas concentration trends through a linear model. In particular, we wanted to understand how the COVID-19-induced changes in gas atmospheric concentrations potentially perturbed linear increases in these concentrations. Therefore, linear models were created with and without the COVID-19 period to see how temperature predictions were perturbed by this short-term period of decrease human activity.
+
+```{r message = F, fig.width = 10, fig.height = 10, fig.cap = "Linear models fit across monthly average gas concentration data with the defined COVID-19 period of December 2019 - July 2021 (blue line), and without the COVID-19 period (red line) extrapolated to 2050 for each of the three indicated greenhouse gases. Black dots indicate actual concentration data. Shaded areas around each line indicates the 95% confidence interval for the true regression line. PPB = parts per billion."}
+x <- ggplot() +
+  geom_point(data = ch4_nonperiod[12:218,], aes(x = Year_Day_decimal, y = Average_ppb))+
+  geom_smooth(data = ch4_df, aes(x = Year_Day_decimal, y = Average_ppb, col = "With Covid Period"), method = "lm", 
+              fullrange = TRUE) +
+  geom_smooth(data = ch4_df[1:160, ], aes(x = Year_Day_decimal, y = Average_ppb, col = "Without Covid Period"),
+              method = "lm", fullrange=TRUE) + xlim(c(2003,2050)) + 
+  xlab("Year") + ylab("PPB") + ggtitle("CH4") +
+  scale_color_manual(name='Linear Trend', breaks=c('With Covid Period', 'Without Covid Period'),
+                     values=c('With Covid Period'='blue', 'Without Covid Period'='red'))
+
+
+y <- ggplot() +
+  geom_point(data = n2o_nonperiod[12:218,], aes(x = Year_Day_decimal, y = Average_ppb))+
+  geom_smooth(data = n2o_df, aes(x = Year_Day_decimal, y = Average_ppb, col = "With Covid Period"), method = "lm", 
+              fullrange = TRUE) +
+  geom_smooth(data = n2o_df[1:160, ], aes(x = Year_Day_decimal, y = Average_ppb, col = "Without Covid Period"),
+              method = "lm", fullrange=TRUE) + xlim(c(2003,2050)) + 
+  xlab("Year") + ylab("PPB") + ggtitle("N2O") +
+  scale_color_manual(name='Linear Trend', breaks=c('With Covid Period', 'Without Covid Period'),
+                     values=c('With Covid Period'='blue', 'Without Covid Period'='red'))
+
+
+z <- ggplot() +
+  geom_point(data = sf6_nonperiod[12:218,], aes(x = Year_Day_decimal, y = Average_ppb))+
+  geom_smooth(data = sf6_df, aes(x = Year_Day_decimal, y = Average_ppb, col = "With Covid Period"), method = "lm", 
+              fullrange = TRUE) +
+  geom_smooth(data = sf6_df[1:160, ], aes(x = Year_Day_decimal, y = Average_ppb, col = "Without Covid Period"),
+              method = "lm", fullrange=TRUE) + xlim(c(2003,2050)) + 
+  xlab("Year") + ylab("PPB") + ggtitle("SF6") +
+  scale_color_manual(name='Linear Trend', breaks=c('With Covid Period', 'Without Covid Period'),
+                     values=c('With Covid Period'='blue', 'Without Covid Period'='red'))
+
+plot_grid(x,y,z)
+
+```
+Below are the regression line formulas used to calculate the 2050 PPB prediction with and without the Covid period. The results of the linear model were opposite to what we expected. Removing the Covid period increased the predicted PPB across the board for our three greenhouse gasses of interest.
+
+```{r, message=FALSE}
+# 2050 predictions
+options(scipen=999)
+
+#ch4 with covid
+lm <- lm(formula = ch4_df$Average_ppb ~ ch4_df$Year_Day_decimal)
+
+#ch4 without covid
+lm_wo <- lm(formula = ch4_df[1:160, ]$Average_ppb ~ ch4_df[1:160, ]$Year_Day_decimal)
+
+#n2o with covid
+lm1 <- lm(formula = n2o_df$Average_ppb ~ n2o_df$Year_Day_decimal)
+
+# n2o without covid
+lm1_wo <- lm(formula = n2o_df[1:160, ]$Average_ppb ~ n2o_df[1:160, ]$Year_Day_decimal)
+
+# sf6 with covid
+lm2 <- lm(formula = sf6_df$Average_ppb ~ sf6_df$Year_Day_decimal)
+
+# sf6 without covid
+lm2_wo <- lm(formula = sf6_df[1:160, ]$Average_ppb ~ sf6_df[1:160, ]$Year_Day_decimal)
+```
+
+CH4 prediction with covid period: `r round(lm$coefficients[1] + (lm$coefficients[2] * 2050.5), 3)` ppb.
+
+CH4 prediction without covid period: `r round(lm_wo$coefficients[1] + (lm_wo$coefficients[2] * 2050.5), 3)` ppb.
+
+N2O prediction with covid period: `r round(lm1$coefficients[1] + (lm1$coefficients[2] * 2050.5), 3)` ppb.
+
+N2O prediction without covid period: `r round(lm1_wo$coefficients[1] + (lm1_wo$coefficients[2] * 2050.5), 3) ppb.
+
+SF6 prediction with covid period: `r round(lm2$coefficients[1] + (lm2$coefficients[2] * 2050.5), 3) ppb
+
+SF6 prediction without covid period: `r round(lm2_wo$coefficients[1] + (lm2_wo$coefficients[2] * 2050.5), 3)` ppb.
+
+
+## NASA Temp Data: Clustering and Correlation
+
 
 # References {-}
