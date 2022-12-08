@@ -1,0 +1,109 @@
+---
+title: "Data Quality Assessment"
+author: "Sujit Sivadanam"
+date: "11/30/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Quality Function
+
+```{r}
+# Column completeness
+col_complete <- function(dataframe){
+  if(!is.data.frame(dataframe)){
+    stop("the object is not a dataframe")
+  }
+  
+  missing_count <- 0
+  for(j in 1:ncol(dataframe)){
+    for(i in 1:nrow(dataframe)){
+      if(is.na(dataframe[i, j])){missing_count <- missing_count+1}
+    }
+  }
+  complete_ratio <- 1 - missing_count/(nrow(dataframe)*ncol(dataframe))
+  return(complete_ratio)
+}
+```
+
+## Assessing Data Quality for Temp Data
+
+```{r}
+library(visdat)
+library(naniar)
+library(tidyverse)
+
+# Analyzing for completeness
+col_complete(temp.data.converted$airsv6)
+col_complete(temp.data.converted$airsv7)
+col_complete(temp.data.converted$ghcnv4)
+
+# Analyzing for consistency
+vis_miss(temp.data.converted$airsv6)
+vis_miss(temp.data.converted$airsv7)
+vis_miss(temp.data.converted$ghcnv4)
+```
+
+## Assessing Data Quality for Gas Data
+
+```{r}
+# Analyzing for completeness
+col_complete(as.data.frame(gas.data.converted$ch4))
+col_complete(as.data.frame(gas.data.converted$n2o))
+col_complete(as.data.frame(gas.data.converted$sf6))
+
+# Analyzing for consistency
+vis_miss(as.data.frame(gas.data.converted$ch4))
+vis_miss(as.data.frame(gas.data.converted$n2o))
+vis_miss(as.data.frame(gas.data.converted$sf6))
+```
+
+## Outliers for Temp Data
+
+```{r}
+airsv6 <- subset(temp.data.converted$airsv6, select = -Year)
+boxplot(subset(airsv6, select = c("Jan", "Feb", "Mar", "Apr")))
+boxplot(subset(airsv6, select = c("May", "Jun", "Jul", "Aug")))
+boxplot(subset(airsv6, select = c("Sep", "Oct", "Nov", "Dec")))
+boxplot(subset(airsv6, select = c("J.D", "D.N", "DJF", "MAM", "JJA", "SON")))
+
+airsv7 <- subset(temp.data.converted$airsv7, select = -Year)
+boxplot(subset(airsv7, select = c("Jan", "Feb", "Mar", "Apr")))
+boxplot(subset(airsv7, select = c("May", "Jun", "Jul", "Aug")))
+boxplot(subset(airsv7, select = c("Sep", "Oct", "Nov", "Dec")))
+boxplot(subset(airsv7, select = c("J.D", "D.N", "DJF", "MAM", "JJA", "SON")))
+
+ghcnv4 <- subset(temp.data.converted$ghcnv4, select = -Year)
+boxplot(subset(ghcnv4, select = c("Jan", "Feb", "Mar", "Apr")))
+boxplot(subset(ghcnv4, select = c("May", "Jun", "Jul", "Aug")))
+boxplot(subset(ghcnv4, select = c("Sep", "Oct", "Nov", "Dec")))
+boxplot(subset(ghcnv4, select = c("J.D", "D.N", "DJF", "MAM", "JJA", "SON")))
+```
+
+## Outliers for Gas Data
+
+```{r}
+ch4 <- subset(as.data.frame(gas.data.converted$ch4), select = -Year)
+n2o <- subset(as.data.frame(gas.data.converted$n2o), select = -Year)
+sf6 <- subset(as.data.frame(gas.data.converted$sf6), select = -Year)
+
+boxplot(subset(ch4, select = Uncertainty_avg))
+boxplot(subset(ch4, select = Uncertainty_trend))
+
+boxplot(subset(n2o, select = Uncertainty_avg))
+boxplot(subset(n2o, select = Uncertainty_trend))
+
+boxplot(subset(sf6, select = Uncertainty_avg))
+boxplot(subset(sf6, select = Uncertainty_trend))
+```
+
+## Report
+
+The ratios of column completeness for both the "airsv6" and "airsv7" datasets are both identically the same (0.9573935) while the ratio of column completeness for the "ghcnv4" dataset was just a bit higher (0.9899749) than the other two. In other words, the datasets are almost complete in that the few missing values are not too big of a concern. All three of the temp datsets are pretty consistent in terms of precision.
+
+In the "airsv6" dataset, the months of January, May, June, & November each have one outlier. In the "airsv7" dataset, January, March, & June each have one outlier while November has five outliers.
+
+For the gas data, the ratios of column completeness for all three data sets (ch4, n2o, sf6) are each 0.9927052, which is very good because these few missing values won't have a significant effect on the data analysis. Furthermore, each column of each of the three datasets are consistently precise. In terms of outliers, the "ch4" dataset has the most outliers.

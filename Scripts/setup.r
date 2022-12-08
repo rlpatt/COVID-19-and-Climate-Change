@@ -20,6 +20,7 @@ library(ggfortify)      # For using autoplot() with prcomp()
 library(ClusterR)       # For k-means clustering
 library(factoextra)     # For elbow plots to determine optimal k
 library(cowplot)
+library(FNN)            # For using get.knn to find k-nearest neighbors of years
 
 # Set up top-level project directory
 # Note that this assumes one of the following:

@@ -81,10 +81,11 @@ Now, it would be interesting to check how the different years correlate in terms
 # See https://www.datanovia.com/en/blog/how-to-create-an-interactive-correlation-matrix-heatmap-in-r/
 # for interactive correlation plot
 
-temp.cor <- temp.data.monthly[["ghcnv4"]] %>%
+temp.data.monthly[["ghcnv4"]] %>%
   t() %>%
   cor(use = "pairwise.complete.obs") %>%
   corrplot(order = "hclust",
+           hclust.method = "complete",
            method = "shade",
            addCoef.col = "white",
            addrect = 3,
@@ -93,9 +94,6 @@ temp.cor <- temp.data.monthly[["ghcnv4"]] %>%
            tl.cex = 2,
            cl.cex = 2,
            rect.lwd = 4)
-
-temp.cor <- temp.data.monthly[[3]] %>% t() %>% cor(use = "pairwise.complete.obs")
-temp.cor.pmat <- cor_pmat(temp.cor)
 ```
 
 
